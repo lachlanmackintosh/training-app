@@ -296,7 +296,7 @@ function exerciseCard(ex, ds, phase, idx) {
       const e = findEntry(ds, m, s), dr = draft[keyOf(ds, m, s)] || {}, lt = lasts.find(x => x.m === m).last;
       const ls = lt && (lt.sets.find(x => x.s === s) || lt.sets[lt.sets.length - 1]);
       const kgV = e ? (e.kg ?? '') : (dr.kg ?? ''), rV = e ? (e.r ?? '') : (dr.r ?? '');
-      const kgPh = ls && ls.kg != null ? ls.kg : (MOV[m].bw || MOV[m].added ? 'BW' : 'kg');
+      const kgPh = ls && ls.kg != null ? ls.kg : (MOV[m].bw || MOV[m].added ? 'BW' : '–');
       const rPh = ls && ls.r != null ? ls.r : (t.maxTime || metricOf(m) === 'sec' ? 'sec' : (metricOf(m) === 'm' ? t.max : t.min));
       rows += `<div class="pline">${two ? `<div class="plabel">${esc(m)}</div>` : ''}
         <label class="fld"><input type="number" inputmode="decimal" step="any" min="0" data-m="${esc(m)}" data-f="kg" value="${esc(kgV)}" placeholder="${esc(kgPh)}" aria-label="${esc(m)} set ${s + 1} weight"><span>${MOV[m].added ? '+kg' : 'kg'}</span></label>
