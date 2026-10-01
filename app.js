@@ -33,8 +33,7 @@ const daysBetween = (a, b) => Math.round((b - a) / 86400000);
 
 /* ---------- block / phase ---------- */
 const PHASES = {
-  pre: { name: 'Before the block', cls: 'ramp', short: 'Block not started yet. Ramp-in rules apply if you train.' },
-  ramp: { name: 'Ramp-in', cls: 'ramp', short: '2 sets of everything. Stop each set 3 reps short of failure. Find your weights.' },
+  pre: { name: 'Before the block', cls: 'ramp', short: 'Block starts Monday. Full sets from day one.' },
   normal: { name: 'Normal week', cls: 'normal', short: 'Main lifts 1–2 RIR, accessories 0–1 RIR. Add reps first, then weight.' },
   heavy: { name: 'Heavy week', cls: 'heavy', short: 'Main lifts (bold) 3 × 3–6, heavier than normal. Accessories stay the same.' },
   deload: { name: 'Deload week', cls: 'deload', short: 'Same exercises, half the sets, same weights or 10% lighter. HIIT = easy cycling.' }
@@ -43,8 +42,7 @@ function blockInfo(d = today()) {
   const days = daysBetween(parseYmd(settings.start), d);
   if (days < 0) return { pre: true, daysTo: -days, week: 0, block: 0, phase: settings.deload ? 'deload' : 'pre' };
   const wi = Math.floor(days / 7), block = Math.floor(wi / 5) + 1, week = (wi % 5) + 1;
-  let phase = week <= 2 ? 'ramp' : week <= 4 ? 'normal' : 'heavy';
-  if (phase === 'ramp' && block > 1 && !settings.rampEveryBlock) phase = 'normal';
+  let phase = week <= 4 ? 'normal' : 'heavy';
   if (settings.deload) phase = 'deload';
   return { pre: false, week, block, totalWeek: wi + 1, phase };
 }
@@ -57,7 +55,6 @@ function target(ex, phase) {
   const sw = isSwapped(ex) ? ex.swap : {};
   let sets = sw.sets || ex.sets, min = sw.min || ex.min, max = sw.max || ex.max;
   const maxTime = ex.maxTime || sw.holdTime;
-  if (phase === 'ramp' || phase === 'pre') sets = Math.min(sets, 2);
   if (phase === 'heavy' && ex.main) { sets = 3; min = 3; max = 6; }
   if (phase === 'deload') sets = Math.max(1, Math.ceil(sets / 2));
   const metric = MOV[partsOf(ex)[0]].metric || 'reps';
@@ -561,9 +558,9 @@ function renderRules() {
     <li>Explosive moves: every rep fast. Stop the set if speed drops.</li>
     <li>Every exercise shows a tempo chip. Follow it.</li></ul></div>
   <div class="card"><h3>Tempo</h3><ul class="list">${Object.keys(TEMPO_INFO).map(k => `<li>${tchip(k)}<div class="small" style="margin-top:6px">${esc(TEMPO_INFO[k].cue)}</div></li>`).join('')}</ul></div>
-  <div class="card"><h3>Ramp-in (weeks 1–2)</h3><ul class="bul">
-    <li>Do <b>2 sets</b> of everything instead of 3.</li><li>Stop each set <b>3 reps short</b> of failure.</li>
-    <li>Find the weights you'll use from week 3.</li></ul></div>
+  <div class="card"><h3>Week 1: find your weights</h3><ul class="bul">
+    <li>Full sets from day one.</li><li>Pick weights you could do <b>2–3 more reps</b> with. Log them.</li>
+    <li>From week 2, push to the normal effort targets and start adding reps.</li></ul></div>
   <div class="card"><h3>Going up (progressive overload)</h3><ul class="bul">
     <li><b>Add reps first.</b> For 3 × 8–10: 8, 8, 8 → 9, 9, 8 → 10, 10, 10.</li>
     <li><b>Then add weight</b> once every set hits the top of the range with good form.</li>
@@ -592,13 +589,11 @@ function renderSettings() {
     <input type="date" id="set-start" value="${esc(settings.start)}"></label>
     <div class="muted small" style="margin-top:8px">Now: ${esc(weekLine(bi))} · ${PHASES[bi.phase].name}</div></div>
   <div class="card">
-    <label class="toggle"><span><b>Ramp-in every block</b><br><span class="muted small">On: weeks 1–2 of every 5-week block are ramp-in. Off: only the first block.</span></span><input type="checkbox" id="set-ramp" ${settings.rampEveryBlock ? 'checked' : ''}></label>
     <label class="toggle"><span><b>Deload week</b><br><span class="muted small">Half the sets, same weights or 10% lighter. Turn off when you're back to normal.</span></span><input type="checkbox" id="set-deload" ${settings.deload ? 'checked' : ''}></label></div>
   <div class="card"><b>Backup</b><div class="grid2" style="margin-top:10px"><button class="btn ghost" data-act="export">Export JSON</button><button class="btn ghost" data-act="import">Import JSON</button></div>
     <div class="muted small" style="margin-top:8px">${log.length} sets stored on this phone. Import merges with what's here.</div></div>
   <div class="card small muted">Exercise images: <a href="https://github.com/yuhonas/free-exercise-db" target="_blank" rel="noopener">free-exercise-db</a> (public domain). Demo videos: YouTube, credited to each channel. Works offline once installed: Safari → Share → Add to Home Screen.</div>`;
   $('#set-start').addEventListener('change', e => { if (e.target.value) { settings.start = e.target.value; save(LS.settings, settings); renderSettings(); toast('Start date saved'); } });
-  $('#set-ramp').addEventListener('change', e => { settings.rampEveryBlock = e.target.checked; save(LS.settings, settings); renderSettings(); });
   $('#set-deload').addEventListener('change', e => { settings.deload = e.target.checked; save(LS.settings, settings); renderSettings(); toast(settings.deload ? 'Deload week on' : 'Deload week off'); });
 }
 
