@@ -143,3 +143,51 @@ input[type=date]{height:50px;border-radius:12px;border:1px solid var(--line);bac
 .closevid{position:absolute;top:6px;right:6px;width:40px;height:40px;border-radius:50%;border:0;background:rgba(0,0,0,.7);color:#fff;font-size:18px;z-index:2}
 .demo-cap b{color:#cfd5dc;font-weight:600}
 .swap{margin-top:12px}
+
+/* v3: heading, tempo chips, HIIT menu, mobility player */
+.apph{font-size:24px;line-height:1.15;margin:4px 0 0;max-width:92%}
+.tempo{display:flex;flex-wrap:wrap;align-items:center;gap:6px 8px;margin-top:8px}
+.tname{font-size:13px;font-weight:700;color:var(--muted);width:100%;margin-bottom:-2px}
+.tchip{display:inline-block;padding:4px 10px;border-radius:999px;font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.05em;border:1px solid;vertical-align:middle;white-space:nowrap}
+.t-exp{color:#ff7a59;background:#2e130c;border-color:#7a2d1a}
+.t-pow{color:#b9a6ff;background:#1d1838;border-color:#4b3fa0}
+.t-con{color:#5fe0b0;background:#0f2a22;border-color:#1f6b52}
+.t-hold{color:#ffd166;background:#2a220c;border-color:#6b5317}
+.tcue{font-size:14px;color:#cfd5dc;flex:1 1 200px}
+.tline{margin-top:6px}
+.ex-mini .sw .tchip{font-size:10px;padding:2px 7px}
+.ex-mini .tline .tchip{font-size:11px;padding:2px 8px}
+.goal{display:inline-block;padding:4px 10px;border-radius:999px;font-size:12px;font-weight:800;border:1px solid}
+.g-vo2{color:#ff7a59;background:#2e130c;border-color:#7a2d1a}
+.g-ana{color:#ffd166;background:#2a220c;border-color:#6b5317}
+.g-fight{color:#ff6b8b;background:#2e0f18;border-color:#7a2340}
+.g-aero{color:#7fd1ff;background:#132733;border-color:#2c5a73}
+a.hcard{display:block;color:var(--text);text-decoration:none}
+a.hcard.pick{border-color:var(--accent)}
+.hname{font-size:17px}
+table.effort{width:100%;border-collapse:collapse;margin-top:8px}
+table.effort td{padding:8px 4px;border-bottom:1px solid var(--line);vertical-align:top}
+table.effort tr:last-child td{border-bottom:0}
+td.rpe{font-size:20px;font-weight:800;color:var(--accent2);width:56px;white-space:nowrap}
+details.card summary{cursor:pointer;min-height:36px;line-height:36px}
+.grid3{display:grid;grid-template-columns:1fr 1.4fr 1fr;gap:8px}
+.grid3 .btn{padding:12px 8px}
+.hiit-clock.mobclock{padding:14px 10px}
+.hiit-clock.mobclock .hiit-time{font-size:72px}
+.hiit-clock.mobclock .hiit-phase{font-size:19px}
+.hiit-clock.mob{background:#11201d;border-color:#1f6b52}
+.mobname{margin:2px 0 8px;font-size:22px}
+.atcue{margin-top:8px;font-size:15px;color:#7fd1ff;font-weight:600}
+.moblist{margin:8px 0 0;padding-left:22px}
+.moblist li{padding:8px 0;border-bottom:1px solid var(--line)}
+.moblist li > span:first-child{display:inline}
+.moblist li .muted{display:block}
+.moblist li.on{color:var(--accent);font-weight:700}
+.moblist li.past{color:var(--muted)}
+.neck{display:inline-block;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.05em;color:#7fd1ff;border:1px solid #2c5a73;border-radius:6px;padding:1px 5px;margin-left:4px;vertical-align:middle}
+.linkbtn{background:none;border:0;color:var(--blue);font-size:15px;min-height:40px;padding:0 4px}
+.demo img.thumb{object-fit:cover}
+.demo .nolink small{display:block;margin-top:4px;font-size:12px}
+.mobcard{border-color:#1f6b52}
+.tabs a{font-size:11px}
+.tabs a .ti{font-size:21px}

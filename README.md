@@ -1,12 +1,12 @@
-# Baki Training App (PWA)
+# Lockie Training Program (PWA)
 
-A mobile-first, offline-capable web app for a 3-session full body + fighter HIIT plan
-(Session 1, Session 2, Session 3 and HIIT). Plain HTML/CSS/JS with no build step, hosted on GitHub Pages.
+Shows as "Baki Program" inside the app. A mobile-first, offline-capable web app for a 3-session full body + fighter HIIT plan,
+with tempo cues, a HIIT menu with interval timers, and a guided daily mobility session. Plain HTML/CSS/JS with no build step, hosted on GitHub Pages.
 
-- `data.js`: the plan (sessions, exercises, sets × reps, rest, swaps, cues, HIIT intervals, nutrition targets, demo video IDs)
+- `data.js`: the plan (sessions, exercises, sets × reps, rest, swaps, tempo, cues), HIIT menu + weekly rotation, mobility sessions, nutrition targets, demo video IDs
 - `app.js`, `styles.css`, `index.html`: the app
 - `sw.js`, `manifest.webmanifest`, `icons/`: offline + Add to Home Screen
-- Demo videos: embedded YouTube (youtube-nocookie) form demos from their original channels, loaded only when you tap play (needs internet)
+- Demo videos: embedded YouTube (youtube-nocookie) demos from their original channels, loaded only when you tap play (needs internet)
 - `img/`: offline still images from [free-exercise-db](https://github.com/yuhonas/free-exercise-db) (public domain, see `img/LICENSE-free-exercise-db.md`)
 
 Training logs are stored only in the phone's localStorage. Nothing is uploaded.

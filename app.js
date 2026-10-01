@@ -1,4 +1,4 @@
-/* Lockie's Baki Training — plain JS, no build step. Data in data.js. */
+/* Baki Program (Lockie Training Program) — plain JS, no build step. Data in data.js. */
 (() => {
 'use strict';
 const LS = { log: 'lockie.log.v1', draft: 'lockie.draft.v1', settings: 'lockie.settings.v1', timer: 'lockie.timer.v1' };
@@ -79,6 +79,7 @@ function rowTarget(t) { return t.maxTime ? (t.reps === 'hold' ? 'hold' : 'max ti
 const restText = s => !s ? 'No rest' : s >= 60 ? (s % 60 ? `${Math.floor(s / 60)} min ${s % 60} s` : `${s / 60} min`) : `${s} s`;
 const ytUrl = name => 'https://www.youtube.com/results?search_query=' + encodeURIComponent(name + ' form').replace(/%20/g, '+');
 const metricOf = m => (MOV[m].metric || 'reps');
+const mvOf = m => MOV[m] || MOB[m];
 const unitLabel = m => ({ reps: 'reps', sec: 'sec', m: 'm' }[metricOf(m)]);
 const kgText = (kg, m) => kg == null || kg === '' ? 'BW' : (MOV[m] && MOV[m].added ? `+${kg}` : `${kg}`);
 const setText = (e) => `${kgText(e.kg, e.m)}${e.kg == null ? '' : ' kg'} × ${e.r ?? '–'}${metricOf(e.m) === 'reps' ? '' : ' ' + unitLabel(e.m)}`;
@@ -183,7 +184,7 @@ function weekLine(bi) {
   return `Block ${bi.block} · Week ${bi.week} of 5`;
 }
 function sessionTitle(k) { return k === 'H' ? 'HIIT' : k === 'R' ? 'Recovery' : PROGRAM[k].title; }
-function sessionSub(k) { return k === 'H' ? 'Saturday · Fighter HIIT (20 min)' : k === 'R' ? '' : `${PROGRAM[k].day} · ${PROGRAM[k].focus}`; }
+function sessionSub(k) { return k === 'H' ? 'Saturday · Fighter conditioning' : k === 'R' ? '' : `${PROGRAM[k].day} · ${PROGRAM[k].focus}`; }
 function nextSession(d) { for (let i = 1; i <= 7; i++) { const n = new Date(d); n.setDate(n.getDate() + i); const k = sessionFor(n); if (k !== 'R') return { k, d: n }; } }
 
 function renderHome() {
@@ -197,21 +198,29 @@ function renderHome() {
       <div class="muted small">${p.exercises.length} exercises · about 60 min · ${done}/${total} sets done</div>
       <a class="btn" style="margin-top:14px" href="#/workout/${k}">${done ? 'Continue workout' : 'Start workout'}</a>`;
   } else if (k === 'H') {
-    todayHtml = `<div class="muted small">Today</div><h2 style="margin:4px 0 2px">HIIT</h2><div class="subt">${esc(sessionSub('H'))}</div>
-      <div class="muted small">${bi.phase === 'deload' ? 'Deload week: easy cycling instead.' : 'Bag work or bike/rower intervals. Legs cooked from Friday? Do bag work or easy cycling.'}</div>
-      <a class="btn" style="margin-top:14px" href="#/hiit">Open HIIT timer</a>`;
+    const pk = hiitPick(d), o = HIIT[pk];
+    todayHtml = `<div class="muted small">Today</div><h2 style="margin:4px 0 2px">HIIT</h2><div class="subt">This week: <b>${esc(o.name)}</b></div>
+      <div class="muted small">${esc(o.desc)} · about ${mins(o.phases)} min · ${esc(GOALS[o.goal].label)}${bi.phase === 'deload' ? ' · Deload week: keep it easy' : ''}</div>
+      <a class="btn" style="margin-top:14px" href="#/hiit/${pk}">Start ${esc(o.name)}</a>
+      <a class="small" style="display:inline-block;margin-top:10px;min-height:36px;line-height:36px" href="#/hiit">See all HIIT sessions</a>`;
   } else {
     const n = nextSession(d);
     todayHtml = `<div class="muted small">Today</div><h2 style="margin:4px 0 6px">Recovery</h2>
-      <div class="muted small">${d.getDay() === 2 ? 'Walk, sun, surf.' : 'Walk, stretch, sleep 8 hours.'} Next up: <b>${esc(sessionTitle(n.k))}</b> (${esc(n.k === 'H' ? 'Fighter HIIT' : PROGRAM[n.k].focus)}) on ${dayName(n.d)}.</div>`;
+      <div class="muted small">${d.getDay() === 2 ? 'Walk, sun, surf.' : 'Walk, stretch, sleep 8 hours.'} Next up: <b>${esc(sessionTitle(n.k))}</b> (${esc(n.k === 'H' ? 'Fighter conditioning' : PROGRAM[n.k].focus)}) on ${dayName(n.d)}.</div>
+      <div class="muted small" style="margin-top:6px">Optional: <a href="#/hiit/z2">Zone 2, 30–45 min</a> on the bike or rower. Easy, talk-test pace.</div>`;
   }
+  const mk = mobKeyFor(d), mo = MOBILITY[mk];
   const n = NUTRITION;
   view().innerHTML = `
-  <div class="row between"><div><div class="muted small">${esc(fmtLong(d))}</div><h1>${esc(APP_NAME)}</h1><div class="muted small">G'day Lockie</div></div>
+  <div class="row between"><div><div class="muted small">${esc(fmtLong(d))}</div><h1 class="apph">${esc(APP_HEADING)}</h1></div>
     <a class="iconbtn" href="#/settings" aria-label="Settings">⚙️</a></div>
   <div class="card"><div class="row between wrap"><b>${esc(weekLine(bi))}</b>${phaseChip(bi)}</div>
     <div class="muted small" style="margin-top:6px">${esc(PHASES[bi.phase].short)}</div></div>
   <div class="card hero">${todayHtml}</div>
+  <div class="card mobcard"><div class="row between"><b>Today's mobility</b><span class="muted small">${mobMins(mk)} min</span></div>
+    <div style="margin-top:4px;font-weight:700;font-size:17px">${esc(mo.name)}</div>
+    <div class="muted small">${esc(mo.moves.slice(0, 4).map(x => x[0]).join(' · '))} …</div>
+    <a class="btn ghost" style="margin-top:10px" href="#/mobility/${mk}">Start mobility</a></div>
   <div class="card"><div class="row between"><b>Nutrition: daily targets</b><span class="muted small">every day</span></div>
     <div class="grid4" style="margin-top:10px">
       <div class="stat"><b>${n.kcal}</b><span>kcal</span></div><div class="stat"><b>${n.protein}</b><span>g protein</span></div>
@@ -235,7 +244,8 @@ function renderProgram() {
   const dayCard = p => `<div class="card"><div class="row between"><div><h3>${esc(p.title)}</h3><div class="subt">${esc(p.day)} · ${esc(p.focus)}</div></div></div>
     ${p.exercises.map(ex => { const t = target(ex, bi.phase); return `<div class="ex-mini"><div class="row between"><div><b>${esc(ex.parts.join(' + '))}</b>${ex.main ? '<span class="badge">Main</span>' : ''}${ex.superset && ex.parts.length > 1 ? '<span class="badge ss">Superset</span>' : ''}</div></div>
       <div class="small"><span class="target">${esc(targetText(target(Object.assign({}, ex, { id: '_' }), bi.phase)))}</span> · <span class="muted">${ex.rest ? 'rest ' + restText(ex.rest) : 'no rest'}</span></div>
-      <div class="sw">Swap: ${esc(ex.swap.label)}</div></div>`; }).join('')}
+      <div class="tline">${tempoChips(ex.parts)}</div>
+      <div class="sw">Swap: ${esc(ex.swap.label)} ${tempoChips(ex.swap.parts)}</div></div>`; }).join('')}
     <a class="btn" style="margin-top:12px" href="#/workout/${p.key}">Open ${esc(p.title)}</a></div>`;
   view().innerHTML = `<h1>Program</h1>
   <div class="row between wrap"><span class="muted small">${esc(weekLine(bi))}</span>${phaseChip(bi)}</div>
@@ -246,18 +256,30 @@ function renderProgram() {
    <li>Main lifts: 2 heavy exercises</li><li>Muscle work: accessories and supersets</li><li>Finisher: neck and grip</li></ol>
    <div class="muted small">Superset = do the two exercises back to back, then rest.</div></div>
   ${['A', 'B', 'C'].map(k => dayCard(PROGRAM[k])).join('')}
-  <div class="card"><h3>HIIT</h3><div class="subt">Saturday · Fighter HIIT (20 min)</div><ul class="bul small">
-   <li><b>Option 1: Bag work.</b> 5 rounds × 3 min hard, 1 min rest.</li>
-   <li><b>Option 2: Bike or rower.</b> 5 min easy, then 8 rounds × 30 s all-out / 90 s easy, then 5 min easy.</li>
-   <li>Legs cooked from Friday? Do bag work, or easy cycling instead.</li></ul>
-   <a class="btn" href="#/hiit">Open HIIT timer</a></div>`;
+  <div class="card"><h3>HIIT</h3><div class="subt">Saturday · Fighter conditioning</div><ul class="bul small">
+   <li>One session a week, rotating: <b>${HIIT_ROTATION.map(k => esc(HIIT[k].name)).join(' → ')}</b>, then repeat.</li>
+   <li>This week: <b>${esc(HIIT[hiitPick()].name)}</b>. 8 sessions to choose from in the HIIT tab.</li>
+   <li>Deload week: Zone 2 instead. Optional Zone 2 on recovery days.</li></ul>
+   <a class="btn" href="#/hiit">Open HIIT</a></div>
+  <div class="card"><h3>Mobility</h3><div class="subt">Every day · 15–20 min follow-along</div>
+   <ul class="list">${MOB_ORDER.map(k => `<li class="row between"><span>${DAYS[MOBILITY[k].day]}</span><span class="muted">${esc(MOBILITY[k].name)}</span></li>`).join('')}</ul>
+   <a class="btn ghost" href="#/mobility">Open mobility</a></div>`;
 }
 
 const dur = n => `${Math.floor(n / 60)}:${pad(n % 60)}`;
+/* tempo chips */
+const tchip = k => `<span class="tchip ${TEMPO_INFO[k].cls}">${TEMPO_INFO[k].label}</span>`;
+const tempoChips = parts => [...new Set(parts.map(m => MOV[m].tempo))].map(tchip).join(' ');
+function tempoHtml(parts) {
+  const ts = [...new Set(parts.map(m => MOV[m].tempo))];
+  if (ts.length === 1) return `<div class="tempo">${tchip(ts[0])}<span class="tcue">${esc(TEMPO_INFO[ts[0]].cue)}</span></div>`;
+  return parts.map(m => `<div class="tempo"><span class="tname">${esc(m)}</span>${tchip(MOV[m].tempo)}<span class="tcue">${esc(TEMPO_INFO[MOV[m].tempo].cue)}</span></div>`).join('');
+}
 // Still image shows instantly (and offline); the YouTube player only loads when tapped.
 function demoHtml(m) {
-  const mv = MOV[m], v = VIDEO[m];
-  const still = mv.img ? `<img src="img/${mv.img}/0.jpg" alt="${esc(m)} still" loading="lazy">` : '<div class="nolink">No still image</div>';
+  const mv = mvOf(m), v = VIDEO[m];
+  const still = mv.img ? `<img src="img/${mv.img}/0.jpg" alt="${esc(m)} still" loading="lazy">`
+    : `<div class="nolink">${esc(m)}<br><small>Video thumbnail needs internet</small></div>${v ? `<img class="thumb" src="https://i.ytimg.com/vi/${v.id}/hqdefault.jpg" alt="${esc(m)} video thumbnail" loading="lazy" onerror="this.remove()">` : ''}`;
   if (!v) return `<div class="part"><div class="demo">${still}</div><div class="demo-cap"><span>No verified video.</span><a class="yt" href="${ytUrl(m)}" target="_blank" rel="noopener">Search YouTube</a></div><p class="cue">${esc(mv.cue)}</p></div>`;
   return `<div class="part" data-m="${esc(m)}">
     <div class="demo vid" data-vid="${v.id}">${still}
@@ -307,6 +329,7 @@ function exerciseCard(ex, ds, phase, idx) {
   const doneAll = countDoneSets(ex, ds, phase) === t.sets;
   return `<section class="ex${doneAll ? ' complete' : ''}" id="ex-${ex.id}">
     <h3>${esc(parts.join(' + '))}${ex.main ? '<span class="badge">Main</span>' : ''}${two ? '<span class="badge ss">Superset</span>' : ''}</h3>
+    ${tempoHtml(parts)}
     <div class="target big">${esc(targetText(t))}</div>
     <div class="muted small">${ex.rest ? 'Rest ' + restText(ex.rest) + (two ? ' after both' : '') : 'No rest'}</div>
     <div class="last">${lastHtml}</div>
@@ -336,60 +359,180 @@ function renderWorkout(k) {
   view().dataset.day = k;
 }
 
+/* ---------- HIIT menu ---------- */
+const mins = ph => Math.round(ph.reduce((a, x) => a + x.secs, 0) / 60);
+function hiitPick(d = today()) { // one recommended session each week; deload = Zone 2
+  const bi = blockInfo(d); if (bi.phase === 'deload') return 'z2';
+  return HIIT_ROTATION[(bi.pre ? 0 : bi.totalWeek - 1) % HIIT_ROTATION.length];
+}
+function rotationAhead(d) { const bi = blockInfo(d), w = bi.pre ? 0 : bi.totalWeek - 1; return [1, 2].map(i => HIIT_ROTATION[(w + i) % HIIT_ROTATION.length]); }
+const goalChip = g => `<span class="goal ${GOALS[g].cls}">${GOALS[g].label}</span>`;
+function effortCard() {
+  return `<div class="card"><b>How hard? (RPE out of 10)</b><table class="effort">${EFFORT.map(([n, l, d]) => `<tr><td class="rpe">${n}</td><td><b>${l}</b><div class="muted small">${esc(d)}</div></td></tr>`).join('')}</table></div>`;
+}
 function renderHIIT() {
-  const bi = blockInfo(), opt = hiit.opt, o = HIIT[opt];
-  const total = o.phases.reduce((a, p) => a + p.secs, 0);
-  view().innerHTML = `<h1>HIIT</h1><div class="subt" style="margin-bottom:6px">Saturday · Fighter HIIT (20 min)</div>
-    ${bi.phase === 'deload' ? '<div class="note deload"><b>Deload week:</b> HIIT becomes easy cycling.</div>' : ''}
-    <div class="seg"><button data-act="hiit-opt" data-v="bag" class="${opt === 'bag' ? 'on' : ''}">🥊 Bag work</button><button data-act="hiit-opt" data-v="bike" class="${opt === 'bike' ? 'on' : ''}">🚴 Bike / rower</button></div>
-    <div class="muted small">${esc(o.name)}: ${esc(o.desc)} · ${Math.round(total / 60)} min total</div>
+  const d = today(), bi = blockInfo(d), pk = hiitPick(d), o = HIIT[pk], [n1, n2] = rotationAhead(d);
+  view().innerHTML = `<h1>HIIT</h1><div class="subt">Saturday · one session a week. No jogging, ever.</div>
+    <div class="card hero" id="hiit-pick"><div class="muted small">This week's pick</div><h2 style="margin:4px 0 4px">${esc(o.name)}</h2>
+      <div class="row wrap" style="gap:6px">${goalChip(o.goal)}<span class="chip">${mins(o.phases)} min</span></div>
+      <div class="muted small" style="margin-top:6px">${esc(o.desc)}. ${esc(o.equip)}.</div>
+      ${bi.phase === 'deload' ? '<div class="note deload"><b>Deload week:</b> Zone 2 instead of hard intervals.</div>' : HIIT_ALT[pk] ? `<div class="muted small" style="margin-top:6px">Can't do it? Swap for ${esc(HIIT_ALT[pk])}.</div>` : ''}
+      <a class="btn" style="margin-top:12px" href="#/hiit/${pk}">Start ${esc(o.name)}</a>
+      <div class="muted small" style="margin-top:10px">Rotation: ${HIIT_ROTATION.map(k => esc(HIIT[k].name)).join(' → ')}, then repeat. Next week: <b>${esc(HIIT[n1].name)}</b>, then ${esc(HIIT[n2].name)}.</div></div>
+    <div class="note"><b>Recovery days (Tue, Thu, Sun):</b> optional <a href="#/hiit/z2">Zone 2, 30–45 min</a> on the bike or rower. Easy, talk-test pace. Good for aerobic base and HRV.</div>
+    <h2>All sessions</h2>
+    ${Object.keys(HIIT).filter(k => !HIIT[k].hidden).map(k => { const x = HIIT[k]; return `<a class="card hcard${k === pk ? ' pick' : ''}" href="#/hiit/${k}" data-k="${k}">
+      <div class="row between"><b class="hname">${esc(x.name)}</b>${k === pk ? '<span class="badge">This week</span>' : ''}</div>
+      <div class="row wrap" style="gap:6px;margin-top:6px">${goalChip(x.goal)}<span class="chip">${k === 'z2' ? '30–45' : mins(x.phases)} min</span></div>
+      <div class="small" style="margin-top:6px">${esc(x.desc)}</div><div class="muted small">🧰 ${esc(x.equip)}</div></a>`; }).join('')}
+    ${effortCard()}`;
+}
+function renderHIITSession(key) {
+  const o = HIIT[key]; if (!o) return go('#/hiit');
+  if (!pSet('hiit', key)) { toast('Pause or reset the running timer first'); return go(pHash()); }
+  const bi = blockInfo(), base = o.variantOf || key, B = HIIT[base];
+  view().innerHTML = `<div class="topbar"><a class="back" href="#/hiit" aria-label="Back">‹</a><div style="flex:1"><h1 style="font-size:22px;margin:0">${esc(o.name)}</h1><div class="subt">${esc(o.desc)}</div></div></div>
+    <div class="row wrap" style="gap:6px">${goalChip(o.goal)}<span class="chip" id="hiit-mins">${mins(o.phases)} min</span>${key === hiitPick() ? '<span class="badge" style="margin:0">This week</span>' : ''}</div>
+    <div class="muted small" style="margin-top:6px">🧰 ${esc(o.equip)}</div>
+    ${bi.phase === 'deload' && o.goal !== 'aero' ? '<div class="note deload"><b>Deload week:</b> do <a href="#/hiit/z2">Zone 2</a> instead.</div>' : ''}
+    ${B.lengths ? `<div class="seg">${Object.entries(B.lengths).map(([k, m]) => `<button data-act="hiit-len" data-v="${k}" class="${k === key ? 'on' : ''}">${m} min</button>`).join('')}</div>` : ''}
     <div class="hiit-clock" id="hiit-clock"><div class="hiit-phase" id="hiit-phase">Ready</div><div class="hiit-time" id="hiit-time">0:00</div><div class="hiit-sub" id="hiit-sub"></div></div>
     <div class="grid2"><button class="btn" data-act="hiit-start" id="hiit-start">Start</button><button class="btn ghost" data-act="hiit-reset">Reset</button></div>
     <button class="btn ghost" style="margin-top:10px" data-act="hiit-skip">Skip to next interval</button>
-    <div class="card"><b>Plan</b><ul class="bul small">${o.phases.map((p, i) => `<li id="hp-${i}">${esc(p.label)}${p.round ? ` ${p.round}/${p.of}` : ''}: ${p.secs >= 60 ? p.secs / 60 + ' min' : p.secs + ' s'}</li>`).join('')}</ul>
-    <div class="muted small">Legs cooked from Friday? Do bag work, or easy cycling instead.</div></div>`;
-  hiitPaint();
+    <div class="card"><b>How to</b><ol class="bul small">${o.how.map(x => `<li>${esc(x)}</li>`).join('')}</ol></div>
+    ${o.demos ? `<div class="card"><b>Technique demos</b><div class="parts">${o.demos.map(demoHtml).join('')}</div></div>` : ''}
+    ${effortCard()}
+    <details class="card"><summary><b>Full timer plan</b> <span class="muted small">(${o.phases.length} intervals)</span></summary><ul class="bul small">${o.phases.map((p, i) => `<li id="hp-${i}">${esc(p.label)}${p.round ? ` ${p.round}/${p.of}` : ''}: ${p.secs >= 60 ? (p.secs % 60 ? `${Math.floor(p.secs / 60)} min ${p.secs % 60} s` : p.secs / 60 + ' min') : p.secs + ' s'}</li>`).join('')}</ul></details>`;
+  pPaint();
 }
 
-/* HIIT engine */
-const hiit = { opt: 'bag', idx: 0, end: 0, left: null, running: false, iv: null, lastBeep: null, done: false, wake: null };
-function hiitPhases() { return HIIT[hiit.opt].phases; }
-function hiitLeft() { if (hiit.running) return Math.max(0, (hiit.end - Date.now()) / 1000); return hiit.left == null ? hiitPhases()[hiit.idx].secs : hiit.left; }
+/* ---------- mobility ---------- */
+const mobKeyFor = d => MOB_ORDER.find(k => MOBILITY[k].day === d.getDay());
+const mobMins = k => Math.round(MOBILITY[k].moves.reduce((a, x) => a + x[1], 0) / 60);
+const moveTime = ([, s, sides]) => `${s >= 60 ? (s % 60 ? `${Math.floor(s / 60)} min ${s % 60} s` : `${s / 60} min`) : `${s} s`}${sides ? ' · both sides' : ''}`;
+function renderMobility() {
+  const d = today(), tk = mobKeyFor(d), mo = MOBILITY[tk];
+  view().innerHTML = `<h1>Mobility</h1><div class="subt">Every day · 15–20 min · follow along</div>
+    <div class="card hero"><div class="muted small">Today · ${DAYS[mo.day]}</div><h2 style="margin:4px 0 2px">${esc(mo.name)}</h2>
+      <div class="muted small">${mobMins(tk)} min · ${mo.moves.length} moves · neck-hump drills included</div>
+      <a class="btn" style="margin-top:12px" href="#/mobility/${tk}">Start ${esc(mo.name)}</a></div>
+    <h2>Pick any session</h2>
+    <div class="card"><ul class="list">${MOB_ORDER.map(k => `<li><a class="item mobitem" href="#/mobility/${k}" data-k="${k}"><span><b>${DAYS[MOBILITY[k].day]}</b><br><span class="muted small">${esc(MOBILITY[k].name)}</span></span><span class="muted small">${mobMins(k)} min ›</span></a></li>`).join('')}</ul></div>
+    <div class="card"><b>Posture cues (Alexander Technique)</b><ul class="bul small">${AT_CUES.map(c => `<li>${esc(c)}</li>`).join('')}</ul>
+      <div class="muted small">Think the cue, don't force it. End every session lying in semi-supine.</div></div>
+    <div class="card"><b>How to</b><ul class="bul small">
+      <li>Breathe slowly. Ease into each stretch: mild tension, never pain.</li>
+      <li>Gym days: do it after training or in the evening, not right before heavy or explosive work.</li>
+      <li>Through the day: screen at eye level, and a few chin tucks every hour.</li>
+      <li>Progress slowly. Range comes from doing a little most days.</li></ul></div>`;
+}
+function renderMobSession(key) {
+  const mo = MOBILITY[key]; if (!mo) return go('#/mobility');
+  if (!pSet('mob', key)) { toast('Pause or reset the running timer first'); return go(pHash()); }
+  view().innerHTML = `<div class="topbar"><a class="back" href="#/mobility" aria-label="Back">‹</a><div style="flex:1"><h1 style="font-size:22px;margin:0">${esc(DAYS[mo.day])} · ${esc(mo.name)}</h1><div class="subt">${mobMins(key)} min · ${mo.moves.length} moves · follow along</div></div></div>
+    <div class="hiit-clock mobclock" id="hiit-clock"><div class="hiit-phase" id="hiit-phase">Ready</div><div class="hiit-time" id="hiit-time">0:00</div><div class="hiit-sub" id="hiit-sub"></div></div>
+    <div class="grid3"><button class="btn ghost" data-act="mob-prev" aria-label="Previous move">‹ Back</button><button class="btn" data-act="hiit-start" id="hiit-start">Start</button><button class="btn ghost" data-act="hiit-skip" aria-label="Next move">Next ›</button></div>
+    <div class="card mobnow" id="mob-now"></div>
+    <div class="card"><div class="row between"><b>Moves</b><button class="linkbtn" data-act="hiit-reset">Reset</button></div><ol class="moblist">${mo.moves.map((x, i) => `<li id="mp-${i}"><span>${esc(x[0])}${MOB[x[0]].neck ? ' <span class="neck">posture</span>' : ''}</span><span class="muted small">${moveTime(x)}</span></li>`).join('')}</ol></div>`;
+  $('#mob-now').dataset.mi = '';
+  pPaint();
+}
+function mobNowPaint() {
+  const box = $('#mob-now'); if (!box) return;
+  const ph = pPhases(), p = ph[Math.min(P.idx, ph.length - 1)], mi = Math.max(0, p.mi), mv = MOBILITY[P.key].moves[mi], m = mv[0];
+  if (box.dataset.mi !== String(mi)) {
+    box.dataset.mi = String(mi);
+    box.innerHTML = `<div class="muted small">Move ${mi + 1} of ${MOBILITY[P.key].moves.length} · ${esc(moveTime(mv))}</div><h2 class="mobname">${esc(m)}</h2>
+      <div class="parts">${demoHtml(m)}</div>
+      <div class="atcue">🧘 ${esc(AT_CUES[mi % AT_CUES.length])}</div>`;
+  }
+  MOBILITY[P.key].moves.forEach((_, i) => { const li = $('#mp-' + i); if (li) li.className = i === mi && !P.done ? 'on' : (i < mi || P.done ? 'past' : ''); });
+}
+
+/* ---------- interval player (HIIT + mobility) ---------- */
+const P = { mode: 'hiit', key: 'n44', idx: 0, end: 0, left: null, running: false, iv: null, lastBeep: null, done: false, wake: null };
+const mobCache = {};
+function mobPhases(key) {
+  if (mobCache[key]) return mobCache[key];
+  const p = [{ label: 'Get ready', kind: 'easy', secs: 10, mi: 0 }];
+  MOBILITY[key].moves.forEach(([m, secs, sides], mi) => {
+    if (sides) { const h = Math.round(secs / 2); p.push({ label: m, m, mi, side: 1, kind: 'mob', secs: h }); p.push({ label: m, m, mi, side: 2, kind: 'mob', secs: secs - h }); }
+    else p.push({ label: m, m, mi, kind: 'mob', secs });
+  });
+  return (mobCache[key] = p);
+}
+const pPhases = () => P.mode === 'mob' ? mobPhases(P.key) : HIIT[P.key].phases;
+const pHash = () => P.mode === 'mob' ? '#/mobility/' + P.key : '#/hiit/' + P.key;
+function pSet(mode, key) {
+  if (P.mode === mode && P.key === key) return true;
+  if (P.running) return false;
+  clearInterval(P.iv); wakeLock(false);
+  Object.assign(P, { mode, key, idx: 0, left: null, running: false, done: false, lastBeep: null }); return true;
+}
+function pLeft() { if (P.running) return Math.max(0, (P.end - Date.now()) / 1000); return P.left == null ? pPhases()[P.idx].secs : P.left; }
 async function wakeLock(on) {
-  try { if (on && 'wakeLock' in navigator) hiit.wake = await navigator.wakeLock.request('screen'); else if (!on && hiit.wake) { await hiit.wake.release(); hiit.wake = null; } } catch (e) {}
+  try { if (on && 'wakeLock' in navigator) P.wake = await navigator.wakeLock.request('screen'); else if (!on && P.wake) { await P.wake.release(); P.wake = null; } } catch (e) {}
 }
-function hiitStartPause() {
+function pStartPause() {
   unlockAudio();
-  if (hiit.done) hiitReset();
-  if (hiit.running) { hiit.left = hiitLeft(); hiit.running = false; clearInterval(hiit.iv); wakeLock(false); }
-  else { hiit.end = Date.now() + hiitLeft() * 1000; hiit.left = null; hiit.running = true; if (hiit.idx === 0 && hiitLeft() >= hiitPhases()[0].secs - 1) beep(1319, .3); hiit.iv = setInterval(hiitTick, 200); wakeLock(true); }
-  hiitPaint();
+  if (P.done) pReset();
+  if (P.running) { P.left = pLeft(); P.running = false; clearInterval(P.iv); wakeLock(false); }
+  else { P.end = Date.now() + pLeft() * 1000; P.left = null; P.running = true; if (P.idx === 0 && pLeft() >= pPhases()[0].secs - 1) beep(1319, .3); P.iv = setInterval(pTick, 200); wakeLock(true); }
+  pPaint();
 }
-function hiitNext() {
-  const ph = hiitPhases();
-  if (hiit.idx >= ph.length - 1) { hiit.running = false; hiit.done = true; clearInterval(hiit.iv); hiit.left = 0; alarm(); wakeLock(false); hiitPaint(); return; }
-  hiit.idx++; const secs = ph[hiit.idx].secs;
-  if (hiit.running) hiit.end = Date.now() + secs * 1000; else hiit.left = secs;
-  const k = ph[hiit.idx].kind; if (k === 'hard') { beep(1319, .25); beep(1319, .25, .3); buzz([300, 100, 300]); } else { beep(660, .4); buzz(400); }
-  hiitPaint();
+function pCue(prev, cur) { // sound + vibration when the interval changes
+  if (P.mode === 'mob') {
+    if (prev && prev.mi === cur.mi && cur.side === 2) { beep(660, .35); buzz(300); }
+    else { beep(1047, .15); beep(1319, .25, .2); buzz([200, 80, 200]); }
+  } else if (cur.kind === 'hard') { beep(1319, .25); beep(1319, .25, .3); buzz([300, 100, 300]); }
+  else { beep(660, .4); buzz(400); }
 }
-function hiitTick() {
-  const left = hiitLeft(), s = Math.ceil(left);
-  if (s <= 3 && s > 0 && hiit.lastBeep !== `${hiit.idx}-${s}`) { hiit.lastBeep = `${hiit.idx}-${s}`; beep(880, .08); }
-  if (left <= 0) hiitNext(); else hiitPaint();
+function pNext(auto) {
+  const ph = pPhases();
+  if (P.idx >= ph.length - 1) { P.running = false; P.done = true; clearInterval(P.iv); P.left = 0; alarm(); wakeLock(false); pPaint(); return; }
+  const prev = ph[P.idx]; P.idx++; const secs = ph[P.idx].secs;
+  if (P.running) P.end = auto ? P.end + secs * 1000 : Date.now() + secs * 1000; else P.left = secs;
+  pCue(prev, ph[P.idx]); pPaint();
 }
-function hiitReset() { clearInterval(hiit.iv); hiit.idx = 0; hiit.left = null; hiit.running = false; hiit.done = false; wakeLock(false); hiitPaint(); }
-function hiitPaint() {
+function pPrev() {
+  const ph = pPhases(); let i = P.idx;
+  if (P.mode === 'mob') { // back = restart this move; tap again within 2 s = previous move
+    const mi = ph[i].mi, first = ph.findIndex(x => x.kind === 'mob' && x.mi === mi), elapsed = ph[i].secs - pLeft();
+    if (ph[i].kind !== 'mob') i = 0;
+    else if (i > first || elapsed > 2) i = first;
+    else i = mi > 0 ? ph.findIndex(x => x.kind === 'mob' && x.mi === mi - 1) : first;
+  } else i = Math.max(0, i - 1);
+  P.idx = i; P.done = false; const secs = ph[i].secs;
+  if (P.running) P.end = Date.now() + secs * 1000; else P.left = secs;
+  pPaint();
+}
+function pTick() {
+  let guard = 0; // catch up if the phone slept through several intervals
+  while (P.running && pLeft() <= 0 && guard++ < 200) pNext(true);
+  if (!P.running) return;
+  const s = Math.ceil(pLeft());
+  if (s <= 3 && s > 0 && P.lastBeep !== `${P.idx}-${s}`) { P.lastBeep = `${P.idx}-${s}`; beep(880, .08); }
+  pPaint();
+}
+function pReset() { clearInterval(P.iv); P.idx = 0; P.left = null; P.running = false; P.done = false; wakeLock(false); pPaint(); }
+function pPaint() {
   const el = $('#hiit-clock'); if (!el) return;
-  const ph = hiitPhases(), p = ph[hiit.idx], s = Math.ceil(hiitLeft());
-  const remain = s + ph.slice(hiit.idx + 1).reduce((a, x) => a + x.secs, 0);
-  el.className = 'hiit-clock ' + (hiit.done ? 'rest' : (hiit.running || hiit.left != null ? p.kind : ''));
-  $('#hiit-phase').textContent = hiit.done ? 'Done. Good work!' : `${p.label}${p.round ? ` · Round ${p.round}/${p.of}` : ''}`;
+  const ph = pPhases(), p = ph[P.idx], s = Math.ceil(pLeft());
+  const remain = s + ph.slice(P.idx + 1).reduce((a, x) => a + x.secs, 0);
+  const active = P.running || P.left != null;
+  el.className = 'hiit-clock' + (P.mode === 'mob' ? ' mobclock' : '') + ' ' + (P.done ? 'rest' : (active ? p.kind : ''));
+  const nx = ph[P.idx + 1];
+  if (P.mode === 'mob') {
+    $('#hiit-phase').textContent = P.done ? 'Done. Nice work!' : p.kind === 'mob' ? `${p.label}${p.side ? ` · side ${p.side} of 2` : ''}` : (active ? 'Get ready' : 'Ready');
+    $('#hiit-sub').textContent = P.done ? 'Finish with a glass of water.' : `Next: ${nx ? (nx.mi === p.mi && nx.side === 2 ? 'switch sides' : nx.label) : 'finish'} · ${Math.floor(remain / 60)}:${pad(remain % 60)} left`;
+  } else {
+    $('#hiit-phase').textContent = P.done ? 'Done. Good work!' : `${p.label}${p.round ? ` · Round ${p.round}/${p.of}` : ''}`;
+    $('#hiit-sub').textContent = P.done ? '' : `Next: ${nx ? nx.label : 'finish'} · ${Math.floor(remain / 60)}:${pad(remain % 60)} left in session`;
+  }
   $('#hiit-time').textContent = `${Math.floor(s / 60)}:${pad(s % 60)}`;
-  const nx = ph[hiit.idx + 1];
-  $('#hiit-sub').textContent = hiit.done ? '' : `Next: ${nx ? nx.label : 'finish'} · ${Math.floor(remain / 60)}:${pad(remain % 60)} left in session`;
-  $('#hiit-start').textContent = hiit.running ? 'Pause' : (hiit.left != null && !hiit.done ? 'Resume' : 'Start');
-  ph.forEach((_, i) => { const li = $('#hp-' + i); if (li) li.style.color = i === hiit.idx && !hiit.done ? 'var(--accent)' : i < hiit.idx || hiit.done ? 'var(--muted)' : ''; });
+  $('#hiit-start').textContent = P.running ? 'Pause' : (P.left != null && !P.done ? 'Resume' : 'Start');
+  if (P.mode === 'mob') mobNowPaint();
+  else ph.forEach((_, i) => { const li = $('#hp-' + i); if (li) li.style.color = i === P.idx && !P.done ? 'var(--accent)' : i < P.idx || P.done ? 'var(--muted)' : ''; });
 }
 
 function renderHistory(m) {
@@ -416,7 +559,8 @@ function renderRules() {
     <li><b>RIR</b> (reps in reserve) = how many more good reps you could have done.</li>
     <li>Main lifts: stop at 1–2 RIR. Accessories: 0–1 RIR.</li>
     <li>Explosive moves: every rep fast. Stop the set if speed drops.</li>
-    <li>Lower for about 2 s, then drive up hard.</li></ul></div>
+    <li>Every exercise shows a tempo chip. Follow it.</li></ul></div>
+  <div class="card"><h3>Tempo</h3><ul class="list">${Object.keys(TEMPO_INFO).map(k => `<li>${tchip(k)}<div class="small" style="margin-top:6px">${esc(TEMPO_INFO[k].cue)}</div></li>`).join('')}</ul></div>
   <div class="card"><h3>Ramp-in (weeks 1–2)</h3><ul class="bul">
     <li>Do <b>2 sets</b> of everything instead of 3.</li><li>Stop each set <b>3 reps short</b> of failure.</li>
     <li>Find the weights you'll use from week 3.</li></ul></div>
@@ -452,7 +596,7 @@ function renderSettings() {
     <label class="toggle"><span><b>Deload week</b><br><span class="muted small">Half the sets, same weights or 10% lighter. Turn off when you're back to normal.</span></span><input type="checkbox" id="set-deload" ${settings.deload ? 'checked' : ''}></label></div>
   <div class="card"><b>Backup</b><div class="grid2" style="margin-top:10px"><button class="btn ghost" data-act="export">Export JSON</button><button class="btn ghost" data-act="import">Import JSON</button></div>
     <div class="muted small" style="margin-top:8px">${log.length} sets stored on this phone. Import merges with what's here.</div></div>
-  <div class="card small muted">Exercise images: <a href="https://github.com/yuhonas/free-exercise-db" target="_blank" rel="noopener">free-exercise-db</a> (public domain). Works offline once installed: Safari → Share → Add to Home Screen.</div>`;
+  <div class="card small muted">Exercise images: <a href="https://github.com/yuhonas/free-exercise-db" target="_blank" rel="noopener">free-exercise-db</a> (public domain). Demo videos: YouTube, credited to each channel. Works offline once installed: Safari → Share → Add to Home Screen.</div>`;
   $('#set-start').addEventListener('change', e => { if (e.target.value) { settings.start = e.target.value; save(LS.settings, settings); renderSettings(); toast('Start date saved'); } });
   $('#set-ramp').addEventListener('change', e => { settings.rampEveryBlock = e.target.checked; save(LS.settings, settings); renderSettings(); });
   $('#set-deload').addEventListener('change', e => { settings.deload = e.target.checked; save(LS.settings, settings); renderSettings(); toast(settings.deload ? 'Deload week on' : 'Deload week off'); });
@@ -523,10 +667,11 @@ document.addEventListener('click', e => {
   else if (act === 'closevid') closeVideo(b);
   else if (act === 'timer-skip') stopRest();
   else if (act === 'timer-add') { if (timer) { timer.end += Number(b.dataset.v) * 1000; timer.total = Math.max(timer.total, (timer.end - Date.now()) / 1000); save(LS.timer, timer); runTimer(); } }
-  else if (act === 'hiit-opt') { if (hiit.running) return toast('Pause or reset first'); hiit.opt = b.dataset.v; hiitReset(); renderHIIT(); }
-  else if (act === 'hiit-start') hiitStartPause();
-  else if (act === 'hiit-reset') hiitReset();
-  else if (act === 'hiit-skip') { unlockAudio(); hiitNext(); }
+  else if (act === 'hiit-len') { if (P.running) return toast('Pause or reset first'); go('#/hiit/' + b.dataset.v); }
+  else if (act === 'hiit-start') pStartPause();
+  else if (act === 'hiit-reset') pReset();
+  else if (act === 'hiit-skip') { unlockAudio(); pNext(false); }
+  else if (act === 'mob-prev') { unlockAudio(); pPrev(); }
   else if (act === 'export') exportLog();
   else if (act === 'import') importLog();
   else if (act === 'finish') { const n = log.filter(x => x.d === todayStr()).length; toast(n ? `Session saved: ${n} sets. Be better, not perfect.` : 'No sets ticked today'); }
@@ -536,11 +681,12 @@ document.addEventListener('click', e => {
 function go(h) { location.hash = h; }
 function route() {
   const h = location.hash.replace(/^#\/?/, '') || 'home', [p, arg] = h.split('/');
-  const tab = { home: 'home', workout: 'home', settings: 'home', program: 'program', hiit: 'hiit', history: 'history', rules: 'rules' }[p] || 'home';
+  const tab = { home: 'home', workout: 'home', settings: 'home', program: 'program', hiit: 'hiit', mobility: 'mobility', history: 'history', rules: 'rules' }[p] || 'home';
   document.querySelectorAll('.tabs a').forEach(a => a.classList.toggle('on', a.dataset.tab === tab));
   if (p === 'workout') renderWorkout(arg);
   else if (p === 'program') renderProgram();
-  else if (p === 'hiit') renderHIIT();
+  else if (p === 'hiit') arg ? renderHIITSession(arg) : renderHIIT();
+  else if (p === 'mobility') arg ? renderMobSession(arg) : renderMobility();
   else if (p === 'history') renderHistory(arg ? decodeURIComponent(arg) : null);
   else if (p === 'rules') renderRules();
   else if (p === 'settings') renderSettings();

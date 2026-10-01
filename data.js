@@ -1,4 +1,4 @@
-/* Lockie's Baki Training Plan — data taken from baki-training-plan.md (1 Oct 2026).
+/* Baki Program (Lockie Training Program) — data taken from the training plan (1 Oct 2026).
    Still images (offline fallback): free-exercise-db (github.com/yuhonas/free-exercise-db), public domain (Unlicense).
    match: 'exact' = same movement; 'closest' = nearest real image available; null = link-only. */
 
@@ -114,17 +114,87 @@ const PROGRAM = {
 const WEEK = { 0: 'R', 1: 'A', 2: 'R', 3: 'B', 4: 'R', 5: 'C', 6: 'H' };
 const WEEK_TABLE = [
   ['Monday', 'Session 1 · Power + Back'], ['Tuesday', 'Recovery (walk, sun, surf)'], ['Wednesday', 'Session 2 · Legs + Chest'],
-  ['Thursday', 'Recovery'], ['Friday', 'Session 3 · Shoulders + Arms'], ['Saturday', 'HIIT · Fighter HIIT (20 min)'], ['Sunday', 'Recovery']
+  ['Thursday', 'Recovery'], ['Friday', 'Session 3 · Shoulders + Arms'], ['Saturday', 'HIIT · this week\u2019s pick'], ['Sunday', 'Recovery']
 ];
 
-const HIIT = {
-  bag: { name: 'Option 1: Bag work', desc: '5 rounds \u00d7 3 min hard, 1 min rest', phases: (() => {
-    const p = []; for (let i = 1; i <= 5; i++) { p.push({ label: 'HARD', kind: 'hard', secs: 180, round: i, of: 5 }); p.push({ label: 'Rest', kind: 'rest', secs: 60, round: i, of: 5 }); } return p; })() },
-  bike: { name: 'Option 2: Bike or rower', desc: '5 min easy, 8 \u00d7 30 s all-out / 90 s easy, 5 min easy', phases: (() => {
-    const p = [{ label: 'Warm-up (easy)', kind: 'easy', secs: 300 }];
-    for (let i = 1; i <= 8; i++) { p.push({ label: 'ALL-OUT', kind: 'hard', secs: 30, round: i, of: 8 }); p.push({ label: 'Easy', kind: 'rest', secs: 90, round: i, of: 8 }); }
-    p.push({ label: 'Cool-down (easy)', kind: 'easy', secs: 300 }); return p; })() }
+/* HIIT menu. Every session has a built-in interval timer. No jogging or distance running.
+   Effort: RPE out of 10 + the talk test. Sources in /workspace/health/hiit-and-mobility-notes.md. */
+const GOALS = {
+  vo2: { label: 'VO2 max', cls: 'g-vo2' },
+  anaerobic: { label: 'Anaerobic power', cls: 'g-ana' },
+  fight: { label: 'Fight conditioning', cls: 'g-fight' },
+  aero: { label: 'Aerobic base / HRV', cls: 'g-aero' }
 };
+// Build a timer: warm-up, rounds of [work, rest] (no rest after the last round), cool-down.
+function intervals({ warm, warmLabel = 'Warm-up (easy, RPE 3)', rounds, work, workLabel, rest, restLabel, cool, coolLabel = 'Cool-down (easy)' }) {
+  const p = [];
+  if (warm) p.push({ label: warmLabel, kind: 'easy', secs: warm });
+  for (let i = 1; i <= rounds; i++) {
+    p.push({ label: workLabel, kind: 'hard', secs: work, round: i, of: rounds });
+    if (i < rounds && rest) p.push({ label: restLabel, kind: 'rest', secs: rest, round: i, of: rounds });
+  }
+  if (cool) p.push({ label: coolLabel, kind: 'easy', secs: cool });
+  return p;
+}
+const HIIT = {
+  n44: { name: 'Norwegian 4×4', goal: 'vo2', equip: 'Bike, rower, or a long steep hill (power-walk up, never jog)',
+    desc: '4 × 4 min hard, 3 min easy between',
+    how: ['Warm up 8 min easy.', '4 min HARD: RPE 8–9. You can only say a few words.', '3 min easy: keep moving, RPE 3.', 'Repeat 4 times, then cool down.', 'Pace it: round 4 should be as hard as round 1, not slower.'],
+    demos: ['Rower technique', 'Air bike technique'],
+    phases: intervals({ warm: 480, rounds: 4, work: 240, workLabel: 'HARD (RPE 8–9)', rest: 180, restLabel: 'Easy (RPE 3)', cool: 300 }) },
+  hill: { name: 'Hill sprints', goal: 'anaerobic', equip: 'A short, steep hill (or flat grass)',
+    desc: '10 × 10 s sprint, walk back down',
+    how: ['Warm up 8 min: brisk walk, leg swings, 3 easy build-up sprints.', 'Sprint 10 s up the hill, all-out (RPE 10).', 'Walk slowly back down. Never jog.', 'Stop early if your speed drops a lot.', 'No hill? Use flat grass, or do Bike sprints.'],
+    phases: intervals({ warm: 480, warmLabel: 'Warm-up: walk, leg swings, 3 build-ups', rounds: 10, work: 10, workLabel: 'SPRINT (all-out)', rest: 80, restLabel: 'Walk back down', cool: 300, coolLabel: 'Cool-down walk' }) },
+  bike: { name: 'Bike sprints', goal: 'anaerobic', equip: 'Air bike or spin bike (rower works too)',
+    desc: '8 × 30 s all-out, 90 s easy',
+    how: ['5 min easy.', '30 s ALL-OUT (RPE 9–10), 90 s slow pedal (RPE 2–3).', '8 rounds, then 5 min easy.', 'Legs cooked from Friday? Do Bag rounds instead.'],
+    demos: ['Air bike technique'],
+    phases: intervals({ warm: 300, warmLabel: 'Warm-up (easy)', rounds: 8, work: 30, workLabel: 'ALL-OUT', rest: 90, restLabel: 'Easy', cool: 300, coolLabel: 'Cool-down (easy)' }) },
+  wingate: { name: 'Wingate sprints', goal: 'vo2', equip: 'Air bike or spin bike with high resistance',
+    desc: '5 × 30 s all-out, 4 min easy',
+    how: ['5 min easy.', '30 s truly ALL-OUT (RPE 10) against heavy resistance.', '4 min very easy pedalling. The long rest lets every sprint be maximal.', 'Do 4 sprints if you are new to this, up to 5–6 later.'],
+    demos: ['Air bike technique'],
+    phases: intervals({ warm: 300, warmLabel: 'Warm-up (easy)', rounds: 5, work: 30, workLabel: 'ALL-OUT', rest: 240, restLabel: 'Very easy', cool: 300, coolLabel: 'Cool-down (easy)' }) },
+  emom: { name: 'Air bike or rower EMOM', goal: 'anaerobic', equip: 'Air bike or rower',
+    desc: '12 min: 15 s sprint at the start of every minute',
+    how: ['5 min easy.', 'Every minute on the minute: 15 s SPRINT (RPE 10), then 45 s easy.', '12 rounds. This trains repeated-sprint ability: recover fast, go again.', 'Aim to keep sprint 12 close to sprint 1.'],
+    demos: ['Air bike technique', 'Rower technique'],
+    phases: intervals({ warm: 300, warmLabel: 'Warm-up (easy)', rounds: 12, work: 15, workLabel: 'SPRINT', rest: 45, restLabel: 'Easy', cool: 300, coolLabel: 'Cool-down (easy)' }) },
+  bag: { name: 'Bag rounds', goal: 'fight', equip: 'Heavy bag + gloves (or shadow-box)',
+    desc: '5 × 3 min rounds, 1 min rest (like a fight)',
+    how: ['3 min easy shadow-boxing to warm up.', '3 min round HARD (RPE 8–9): combos, footwork, last 10 s all-out.', '1 min rest: breathe slow, nose if you can.', '5 rounds.'],
+    phases: intervals({ warm: 180, warmLabel: 'Warm-up: easy shadow-boxing', rounds: 5, work: 180, workLabel: 'HARD', rest: 60, restLabel: 'Rest', cool: 120, coolLabel: 'Cool-down: walk + breathe' }) },
+  circuit: { name: 'Combat circuit', goal: 'fight', equip: 'Kettlebell (16–24 kg), floor, bag (or shadow-box)',
+    desc: '4 rounds: burpees, KB swings, sprawls, bag flurry',
+    how: ['4 min easy warm-up.', 'Each move 40 s hard, 20 s to switch.', 'Burpees → KB swings → sprawls → bag flurry (fast straight punches).', '1 min rest after each round. 4 rounds.'],
+    demos: ['Burpee', 'Kettlebell swing', 'Sprawl'],
+    phases: (() => {
+      const p = [{ label: 'Warm-up (easy)', kind: 'easy', secs: 240 }], mv = ['Burpees', 'KB swings', 'Sprawls', 'Bag flurry'];
+      for (let r = 1; r <= 4; r++) {
+        mv.forEach((m, i) => { p.push({ label: m.toUpperCase(), kind: 'hard', secs: 40, round: r, of: 4 }); if (i < 3) p.push({ label: 'Switch: ' + mv[i + 1], kind: 'rest', secs: 20, round: r, of: 4 }); });
+        if (r < 4) p.push({ label: 'Rest', kind: 'rest', secs: 60, round: r, of: 4 });
+      }
+      p.push({ label: 'Cool-down: walk + breathe', kind: 'easy', secs: 180 }); return p; })() },
+  z2: { name: 'Zone 2', goal: 'aero', equip: 'Bike or rower (or a brisk incline walk). No jogging.',
+    desc: '30–45 min steady and easy',
+    how: ['Talk test: you can talk in full sentences, but you could not sing. RPE 3–4.', 'Breathe through your nose if you can.', 'If you are puffing, slow down. Easy is the point.', 'Good on recovery days (Tue, Thu, Sun) and in deload weeks.'],
+    demos: ['Rower technique'], lengths: { z2: 30, z2_45: 45 },
+    phases: [{ label: 'Warm-up (very easy)', kind: 'easy', secs: 300 }, { label: 'Zone 2 steady (talk test)', kind: 'rest', secs: 1200 }, { label: 'Cool-down (very easy)', kind: 'easy', secs: 300 }] },
+  z2_45: { name: 'Zone 2', goal: 'aero', hidden: true, variantOf: 'z2', equip: 'Bike or rower (or a brisk incline walk). No jogging.',
+    desc: '45 min steady and easy', how: null, demos: ['Rower technique'],
+    phases: [{ label: 'Warm-up (very easy)', kind: 'easy', secs: 300 }, { label: 'Zone 2 steady (talk test)', kind: 'rest', secs: 2100 }, { label: 'Cool-down (very easy)', kind: 'easy', secs: 300 }] }
+};
+HIIT.z2_45.how = HIIT.z2.how;
+// One HIIT day a week (Saturday): rotate every week. Deload week: Zone 2 instead.
+const HIIT_ROTATION = ['n44', 'hill', 'circuit'];
+const HIIT_ALT = { n44: 'Bike sprints or Wingate sprints', hill: 'Bike sprints or the EMOM', circuit: 'Bag rounds' };
+const EFFORT = [
+  ['2–3', 'Easy', 'Chat in full sentences. Warm-ups and recoveries.'],
+  ['3–4', 'Zone 2', 'Full sentences, but you couldn\u2019t sing.'],
+  ['8–9', 'Hard', 'Only a few words at a time. 4×4, bag rounds, circuit.'],
+  ['10', 'All-out', 'Can\u2019t talk. Sprints only.']
+];
 
 const NUTRITION = { kcal: 2500, protein: 175, carbs: 220, fat: 100 };
 
@@ -195,4 +265,131 @@ const VIDEO = {
   "Trap bar hold": { id: "df-MeZsxCAM", title: "Trap Bar Farmers Carry", ch: "John Rusin", secs: 23, note: "Trap bar carry: same pick-up and grip, just stand still and hold" }
 };
 
-const APP_NAME = 'Baki Training App';
+const APP_HEADING = 'Baki Program';
+
+/* Tempo tag for every exercise and swap. */
+const TEMPO_INFO = {
+  explosive: { label: 'Explosive', cls: 't-exp', cue: 'Max intent, every rep fast, full rest, stop if speed drops.' },
+  power: { label: 'Power-controlled', cls: 't-pow', cue: 'Lower under control (2–3 s), drive up hard and fast.' },
+  controlled: { label: 'Controlled', cls: 't-con', cue: 'Slow and controlled, 2–3 s down, squeeze at the top, no swinging.' },
+  brace: { label: 'Brace + hold', cls: 't-hold', cue: 'Brace and stand tall.' }
+};
+const TEMPO_GROUPS = {
+  explosive: ['Med-ball slam', 'Kettlebell swing', 'Broad jump', 'Box jump', 'Squat jump', 'Med-ball chest pass', 'Explosive push-up', 'Med-ball rotational throw', 'Cable woodchop (fast)', 'Lateral bound', 'Skater hop'],
+  power: ['Trap bar deadlift', 'Conventional deadlift', 'Back squat', 'Leg press or hack squat', 'Incline barbell bench', 'Flat DB bench', 'Military press', 'Seated DB shoulder press', 'Romanian deadlift', 'DB RDL or lying leg curl', 'Weighted pull-up', 'Wide-grip lat pulldown', 'Barbell row', 'Chest-supported DB row'],
+  controlled: ['Incline DB press', 'Incline barbell or machine press', 'DB lateral raise', 'Cable lateral raise', 'Hammer curl', 'Skull-crusher', 'Rope hammer curl', 'Overhead DB extension', 'Neck curl', 'Neck extension', 'Plate-loaded neck harness', 'Walking lunge', 'Bulgarian split squat', 'Dips', 'Close-grip bench', 'Standing calf raise', 'Seated calf raise', 'Hanging knee raise', 'Cable crunch', 'Close-grip cable row', 'Seated machine row', 'Rear delt fly', 'Shrug', 'Face pull', 'DB shrug', 'Incline DB curl', 'Rope pushdown', 'EZ bar curl', 'Overhead cable extension', 'Reverse curl', 'Wrist roller'],
+  brace: ['Dead hang', 'Farmer hold', 'Farmer carry', 'Trap bar hold']
+};
+for (const [k, list] of Object.entries(TEMPO_GROUPS)) for (const m of list) MOV[m].tempo = k;
+
+/* Mobility moves (and HIIT technique demos). img = free-exercise-db still (public domain) where one matches. */
+const MOB = {
+  'Chin tuck': { neck: true, cue: 'Sit or stand tall. Glide your head straight back (make a double chin), hold 3 s, relax. Eyes stay level. Slow reps.' },
+  'Supine chin-tuck head lift': { neck: true, cue: 'Lie on your back. Nod your chin in gently, then lift your head 2–3 cm off the floor. Hold 5–10 s, rest, repeat.' },
+  'Wall angel': { neck: true, cue: 'Back, head and bum on the wall, arms in a W. Slide the arms up and down slowly, keeping contact. Ribs down.' },
+  'Foam roller T-spine extension': { neck: true, cue: 'Roller across the upper back, hands support your head. Arch back over it and breathe out. Move it up a few cm and repeat. Not on the lower back.' },
+  'Doorway pec stretch': { neck: true, img: 'One_Arm_Against_Wall', match: 'closest', cue: 'Forearm on the door frame, elbow at shoulder height. Step through until the chest stretches. Breathe.' },
+  'Prone Y-T-W': { neck: true, cue: 'Lie face down, thumbs up. Lift the arms into a Y, then a T, then a W. Shoulder blades down and back. Neck long, look at the floor.' },
+  'Band pull-apart': { neck: true, cue: 'Arms straight at chest height. Pull the band apart until it touches your chest. Shoulders down, chin tucked, slow return.' },
+  'Neck CARs': { neck: true, cue: 'Sit tall. Slowly draw the biggest pain-free circle you can with your chin, 3 each way. Smooth, never forced.' },
+  'Levator scapulae stretch': { neck: true, img: 'Side_Neck_Stretch', match: 'closest', cue: 'Sit on one hand. Turn your nose toward the other armpit and gently ease the head down with that hand. Breathe.' },
+  'Semi-supine rest': { cue: 'Lie on your back, knees bent, feet flat, a book or two under your head, hands on your belly. Let your neck be free, let your back lengthen and widen. Just rest.' },
+  'Cat-cow': { img: 'Cat_Stretch', match: 'exact', cue: 'On hands and knees. Breathe in, drop the belly and look up. Breathe out, round the back and tuck the chin. Slow.' },
+  '90/90 hip switch': { cue: 'Sit with both knees bent at 90°. Rotate both knees to the other side and back, chest tall. Hands behind you if needed.' },
+  'Couch stretch': { cue: 'Back knee against a wall or couch, shin up the wall, front foot forward. Squeeze your bum and stay tall.' },
+  'Hip CARs': { cue: 'On hands and knees (or standing, holding a wall). Draw the biggest, slowest circle you can with your knee. Everything else still.' },
+  'Deep squat hold': { cue: 'Feet shoulder width, toes out a little. Sit as low as you can, heels down (hold a post or put plates under the heels). Chest tall, breathe.' },
+  'Frog stretch': { cue: 'On all fours, knees wide, ankles in line with the knees. Rock the hips back slowly until the inner thighs stretch.' },
+  'Pigeon stretch': { cue: 'Front shin across in front of you, back leg long. Stay tall or fold forward over the front leg. Feel the outside of the hip.' },
+  'Cossack squat': { cue: 'Wide stance. Sit into one hip, other leg straight, toes up. Go as low as is comfortable, then shift across. Hold a post if needed.' },
+  'Half-kneeling hip flexor stretch': { img: 'Kneeling_Hip_Flexor', match: 'exact', cue: 'Kneel on one knee. Squeeze the back-leg glute and tuck the pelvis under, then shift forward a little. Tall chest.' },
+  "World's greatest stretch": { img: 'Worlds_Greatest_Stretch', match: 'exact', cue: 'Big lunge, hands inside the front foot. Drop the elbow toward the floor, then rotate and reach that arm to the ceiling.' },
+  'Pancake stretch': { img: 'The_Straddle', match: 'closest', cue: 'Legs wide, knees pointing up. Sit tall, hinge forward from the hips and walk the hands out. Sit on a cushion if your back rounds.' },
+  'Jefferson curl (light)': { cue: 'Stand on a box with an empty bar or 5–10 kg. Tuck the chin and roll down one vertebra at a time, then roll up slowly. Light and slow only.' },
+  'Kneeling hamstring stretch': { cue: 'Half-kneel, front leg straight, toes up (a half split). Back flat, hinge forward from the hips until the hamstring stretches.' },
+  'Strap hamstring stretch': { img: 'Lying_Hamstring', match: 'closest', cue: 'Lie on your back, strap or towel around one foot. Pull the straight leg up until the hamstring stretches. Other leg flat.' },
+  'Shoulder CARs': { cue: 'Stand tall, make a fist. Slowly draw the biggest circle you can with a straight arm, body still. 3 each way.' },
+  'Thread the needle': { cue: 'On all fours. Slide one arm under your body and rest the shoulder down, then open up and reach that arm to the ceiling.' },
+  'Open book': { cue: 'Lie on your side, knees bent to 90°, arms together in front. Open the top arm across to the other side, eyes follow the hand. Knees stay together.' },
+  'Bench lat stretch': { cue: 'Kneel in front of a bench, elbows on it, a stick between your hands. Sit the hips back and drop the chest.' },
+  'Stick shoulder pass-through': { cue: 'Wide grip on a broomstick, arms straight. Lift it over your head and behind you, then back. Widen the grip if it pinches.' },
+  'Knee-to-wall ankle mobilisation': { cue: 'Foot a hand\u2019s width from the wall. Drive the knee forward to touch the wall, heel stays down. Rock in and out; move the foot back as it gets easier.' },
+  'Ankle CARs': { img: 'Ankle_Circles', match: 'closest', cue: 'Sit, or stand on one leg. Draw slow, big circles with your foot, shin still. 5 each way.' },
+  'Wall calf stretch': { img: 'Calf_Stretch_Hands_Against_Wall', match: 'exact', cue: 'Hands on the wall, one leg back, heel down. Straight knee first, then bend the knee a little for the deeper calf.' },
+  'Tibialis raise': { cue: 'Back against a wall, heels about 30 cm out. Lift your toes as high as you can, lower slowly. 15–20 reps.' },
+  'Goblet squat pry': { img: 'Goblet_Squat', match: 'closest', cue: 'Hold a kettlebell at your chest and squat deep. Use the elbows to ease the knees out and shift side to side. Breathe.' },
+  "Child's pose": { img: 'Childs_Pose', match: 'exact', cue: 'Kneel, big toes together, knees wide. Sit back on your heels and reach the arms forward. Breathe into your back.' },
+  'Supine twist': { cue: 'Lie on your back, bring one knee across your body, other leg long. Arms out wide, shoulders down. Breathe out and relax into it.' },
+  'Downward dog': { cue: 'Hands and feet on the floor, hips high. Bend the knees as much as you need to keep the back long. Push the floor away.' },
+  'Crocodile breathing': { cue: 'Lie face down, forehead on your hands. Breathe slowly into your belly so your lower back rises. 4 s in, 6 s out.' },
+  'Happy baby': { cue: 'Lie on your back, hold the outsides of your feet, knees wide. Gently pull the knees toward the floor, lower back down.' },
+  'Sphinx pose': { cue: 'Lie face down, forearms under your shoulders. Lift the chest gently, neck long, shoulders down.' },
+  'Inchworm': { img: 'Inchworm', match: 'exact', cue: 'Stand, bend down and walk the hands out to a plank. Walk the feet in toward the hands, legs as straight as you can.' },
+  // HIIT technique demos
+  'Burpee': { cue: 'Squat, hands down, jump the feet back to a plank, chest to the floor, jump the feet in, jump up. Steady rhythm.' },
+  'Sprawl': { cue: 'From fight stance, drop the hands and shoot the legs back, hips down hard. Bounce back up to stance fast.' },
+  'Rower technique': { img: 'Rowing_Stationary', match: 'exact', cue: 'Legs, then body, then arms. On the way back: arms, body, then legs. Drive with the legs. Damper 4–6.' },
+  'Air bike technique': { cue: 'Sit tall, push and pull the handles while you pedal. For sprints, go all-out from the first second.' }
+};
+/* 7 follow-along sessions, 15–20 min. [move, seconds, 'sides'] — sided moves switch at half time. */
+const MOBILITY = {
+  mon: { day: 1, name: 'Hips + posture', moves: [['Cat-cow', 60], ['Chin tuck', 60], ['90/90 hip switch', 120], ['Half-kneeling hip flexor stretch', 120, 'sides'], ['Couch stretch', 120, 'sides'], ['Hip CARs', 120, 'sides'], ['Wall angel', 90], ['Deep squat hold', 90], ['Doorway pec stretch', 60], ['Semi-supine rest', 180]] },
+  tue: { day: 2, name: 'Shoulders + T-spine', moves: [['Shoulder CARs', 120, 'sides'], ['Foam roller T-spine extension', 90], ['Open book', 120, 'sides'], ['Thread the needle', 120, 'sides'], ['Bench lat stretch', 90], ['Stick shoulder pass-through', 60], ['Doorway pec stretch', 120, 'sides'], ['Prone Y-T-W', 90], ['Chin tuck', 60], ['Band pull-apart', 60], ['Semi-supine rest', 120]] },
+  wed: { day: 3, name: 'Hips + hamstrings', moves: [['Cat-cow', 60], ['Strap hamstring stretch', 120, 'sides'], ['Kneeling hamstring stretch', 120, 'sides'], ['Pancake stretch', 120], ['Jefferson curl (light)', 90], ['Frog stretch', 90], ['Pigeon stretch', 120, 'sides'], ['Cossack squat', 90], ['Supine chin-tuck head lift', 60], ['Wall angel', 60], ['Semi-supine rest', 120]] },
+  thu: { day: 4, name: 'Neck + posture', moves: [['Neck CARs', 60], ['Chin tuck', 90], ['Supine chin-tuck head lift', 90], ['Levator scapulae stretch', 120, 'sides'], ['Foam roller T-spine extension', 90], ['Wall angel', 90], ['Doorway pec stretch', 120, 'sides'], ['Prone Y-T-W', 90], ['Band pull-apart', 60], ['Crocodile breathing', 60], ['Semi-supine rest', 300]] },
+  fri: { day: 5, name: 'Full-body flow', moves: [['Cat-cow', 60], ['Inchworm', 60], ["World's greatest stretch", 120, 'sides'], ['Downward dog', 60], ['90/90 hip switch', 90], ['Thread the needle', 90, 'sides'], ['Deep squat hold', 90], ['Shoulder CARs', 90, 'sides'], ['Hip CARs', 90, 'sides'], ['Chin tuck', 60], ['Wall angel', 60], ['Semi-supine rest', 120]] },
+  sat: { day: 6, name: 'Ankles + squat depth', moves: [['Ankle CARs', 90, 'sides'], ['Knee-to-wall ankle mobilisation', 120, 'sides'], ['Wall calf stretch', 120, 'sides'], ['Tibialis raise', 60], ['Goblet squat pry', 120], ['Deep squat hold', 120], ['Frog stretch', 90], ['Couch stretch', 120, 'sides'], ['Chin tuck', 60], ['Foam roller T-spine extension', 60], ['Semi-supine rest', 120]] },
+  sun: { day: 0, name: 'Recovery flow + semi-supine', moves: [['Crocodile breathing', 90], ['Cat-cow', 60], ["Child's pose", 90], ['Sphinx pose', 60], ['Supine twist', 120, 'sides'], ['Happy baby', 60], ['Pigeon stretch', 120, 'sides'], ['Strap hamstring stretch', 120, 'sides'], ['Supine chin-tuck head lift', 60], ['Semi-supine rest', 300]] }
+};
+const MOB_ORDER = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
+/* Alexander Technique-style posture cues: short, rotate through the session. */
+const AT_CUES = ['Let your neck be free.', 'Let your head go forward and up, not pulled back or down.', 'Let your back lengthen and widen.', 'Let your knees go forward and away.', 'Notice tension, then let it go. Don\u2019t force a \u201cgood posture\u201d.', 'Breathe out fully. Let the in-breath happen on its own.'];
+
+/* Mobility + HIIT technique videos, checked the same way on 1 Oct 2026 (oEmbed 200 + title match, playable + embeddable). */
+Object.assign(VIDEO, {
+  "Chin tuck": { id: "KqR1EoEmq9c", title: "You're Doing Chin Tucks WRONG | Physical Therapist Teaches The Correct Way", ch: "Rehab and Revive", secs: 211 },
+  "Supine chin-tuck head lift": { id: "7OgvJ653oxE", title: "Chin tuck and lift (supine)", ch: "Revival Performance Physical Therapy", secs: 88 },
+  "Wall angel": { id: "cvx06snMQ3A", title: "Wall Angel", ch: "Rehab My Patient", secs: 31 },
+  "Foam roller T-spine extension": { id: "SQF-0s1CckA", title: "Thoracic Spine Mobility using a Foam Roller", ch: "[P]rehab", secs: 35 },
+  "Doorway pec stretch": { id: "M850sCj9LHQ", title: "How to Do a Doorway Pec Stretch Exercise | 90 Degrees Abduction | MedBridge", ch: "Medbridge", secs: 37 },
+  "Prone Y-T-W": { id: "QdGTI4Lshg4", title: "Prone Y T W", ch: "The Active Life", secs: 31 },
+  "Band pull-apart": { id: "smSSXITNpCI", title: "How To Do Band Pull Aparts", ch: "Rogue Fitness", secs: 29 },
+  "Neck CARs": { id: "J3tkQ4pk_Sc", title: "Controlled Articular Rotations (CARs) - Neck", ch: "Tangelo - Seattle Chiropractor + Rehab", secs: 98 },
+  "Levator scapulae stretch": { id: "GSoXPJRnR6E", title: "Levator Scapula Stretch - Ask Doctor Jo", ch: "AskDoctorJo", secs: 41 },
+  "Semi-supine rest": { id: "NhxMNou1Tfo", title: "Alexander Technique | Active Rest (Lying down in Semi Supine)", ch: "Alexander Technique", secs: 84 },
+  "Cat-cow": { id: "1Y0YjXS9sKI", title: "How to Do a Cat Cow Stretch: A Guide from Physical Therapists", ch: "Hinge Health", secs: 62 },
+  "90/90 hip switch": { id: "m51AZSXMvEA", title: "90 90 Hip Switch", ch: "The Active Life", secs: 31 },
+  "Couch stretch": { id: "Fg-lwNBzVV8", title: "Couch Stretch", ch: "Men's Health", secs: 53 },
+  "Hip CARs": { id: "hRMrq6G81p8", title: "Controlled Articular Rotations (CARs) for Your Hips", ch: "Cleveland Clinic", secs: 83 },
+  "Deep squat hold": { id: "IHApHfNA2Ag", title: "How to Do a Deep Squat According to Physical Therapists", ch: "Hinge Health", secs: 69 },
+  "Frog stretch": { id: "7d-4CkcXWVU", title: "Frog Stretch", ch: "SOFLETE", secs: 35 },
+  "Pigeon stretch": { id: "lqCqETr7Q0g", title: "How to Do a Pigeon Pose: A Guide from Physical Therapists", ch: "Hinge Health", secs: 76 },
+  "Cossack squat": { id: "tpczTeSkHz0", title: "How to Cossack Squat Mobility Exercise: Tutorial & Progressions", ch: "FitnessFAQs", secs: 181 },
+  "Half-kneeling hip flexor stretch": { id: "gqoPYLUgP48", title: "Bulletproof Step-by-step Guide to the Half Kneeling Hip Flexor Stretch\" [stretching advice]", ch: "[P]rehab", secs: 60 },
+  "World's greatest stretch": { id: "-CiWQ2IvY34", title: "The World's Greatest Stretch (Mobility Exercise) by Squat University", ch: "Squat University", secs: 42 },
+  "Pancake stretch": { id: "b0kCd4L20V8", title: "Full Guide: How to Pancake Stretch (Beginner to Advanced)", ch: "Kevin Cha | About Wellness", secs: 327 },
+  "Jefferson curl (light)": { id: "YGlAdtSKQaU", title: "Jefferson Curls", ch: "The Barbell Physio", secs: 24 },
+  "Kneeling hamstring stretch": { id: "MiAXGtx_J0M", title: "How to do a Kneeling Hamstring stretch", ch: "Medibank", secs: 23 },
+  "Strap hamstring stretch": { id: "Il1L75v6gq0", title: "Hamstring Stretch with a Strap, Supine - Ask Doctor Jo", ch: "AskDoctorJo", secs: 39 },
+  "Shoulder CARs": { id: "CLWFwun1BfQ", title: "Controlled Articular Rotations (CARs) - Shoulder", ch: "Tangelo - Seattle Chiropractor + Rehab", secs: 113 },
+  "Thread the needle": { id: "SkQhKf74nZk", title: "How to Do a Thread the Needle Stretch: A Guide from Physical Therapists", ch: "Hinge Health", secs: 73 },
+  "Open book": { id: "OW6YHlxY6JI", title: "Open Book Stretch - Physical Therapy Exercises", ch: "TSAOG Orthopaedics & Spine", secs: 60 },
+  "Bench lat stretch": { id: "6Fc0u9xPkL8", title: "The Bench Stretch - The Ultimate Lat and Thoracic Spine Mobility Exercise", ch: "The Barbell Physio", secs: 66 },
+  "Stick shoulder pass-through": { id: "rVBdvlriNlw", title: "Shoulder Dislocates with a stick or PVC pipe", ch: "Tom Morrison", secs: 90 },
+  "Knee-to-wall ankle mobilisation": { id: "ElrpduJn92Y", title: "Knee To Wall Exercise for Ankle Mobility", ch: "Dr. Jess Harvey, Osteopath & Health Coach", secs: 53 },
+  "Ankle CARs": { id: "BDNGAnp7u7s", title: "Controlled Articular Rotations (CARs) - Ankle", ch: "Tangelo - Seattle Chiropractor + Rehab", secs: 80 },
+  "Wall calf stretch": { id: "trC42QD0wQI", title: "Calf Stretch", ch: "Sheffield Teaching Hospitals NHS Foundation Trust", secs: 76 },
+  "Tibialis raise": { id: "VzIcGAgBiaM", title: "Tibialis Wall Raises (Exercise Demo)", ch: "The Barefoot Sprinter", secs: 25 },
+  "Goblet squat pry": { id: "TcXOrjCAyPg", title: "Kettlebell Prying Goblet Squat | StrongFirst", ch: "StrongFirst", secs: 149 },
+  "Child's pose": { id: "nMp3MlTz9fA", title: "How to do a child's pose stretch", ch: "Medibank", secs: 22 },
+  "Supine twist": { id: "mNdJti7ZwKI", title: "Supine Spinal Twist for Spine Mobility", ch: "Vive Health", secs: 75 },
+  "Downward dog": { id: "sd-Fn6xpyeg", title: "Yoga For Men | How To Do a Downward Dog For Inflexible Beginners", ch: "Body By Yoga", secs: 92 },
+  "Crocodile breathing": { id: "8AL2DyYpBFc", title: "How To Do Crocodile Breathing - Tangelo Health", ch: "Tangelo - Seattle Chiropractor + Rehab", secs: 66 },
+  "Happy baby": { id: "DsuQQMzFU-4", title: "How to Do the Happy Baby Pose: A Guide from Physical Therapists", ch: "Hinge Health", secs: 76 },
+  "Sphinx pose": { id: "-J9zcJYACrk", title: "Sphinx Pose for Spine Health", ch: "BioSpine Institute", secs: 80 },
+  "Inchworm": { id: "VSp0z7Mp5IU", title: "How to Do an Inchworm | Abs Workout", ch: "Howcast", secs: 88 },
+  "Burpee": { id: "G2hv_NYhM-A", title: "How To Do Burpees With Proper Form", ch: "BuiltLean®", secs: 69 },
+  "Sprawl": { id: "YyA0JAnK5l8", title: "Sprawl Solo Drill - Wrestling for MMA", ch: "Flow Athletics", secs: 129 },
+  "Rower technique": { id: "4zWu1yuJ0_g", title: "Correct Rowing Machine Technique, Improve Your Rowing  | Concept2", ch: "concept2usa", secs: 113 },
+  "Air bike technique": { id: "KC-ZSfOmXgE", title: "HOW TO USE THE AIRBIKE", ch: "Nutrition Warehouse", secs: 55 }
+});
