@@ -1,5 +1,5 @@
 /* Lockie's Baki Training Plan — data taken from baki-training-plan.md (1 Oct 2026).
-   Demo images: free-exercise-db (github.com/yuhonas/free-exercise-db), public domain (Unlicense).
+   Still images (offline fallback): free-exercise-db (github.com/yuhonas/free-exercise-db), public domain (Unlicense).
    match: 'exact' = same movement; 'closest' = nearest real image available; null = link-only. */
 
 // Movement library. Key = movement name used for logging/history.
@@ -74,7 +74,7 @@ const MOV = {
 /* Exercises per day. sets/min/max = plan targets. each = 'each' text. rest in seconds.
    main = bold main lift (heavy week applies). group: explosive | main | muscle | finisher */
 const PROGRAM = {
-  A: { key: 'A', day: 'Monday', title: 'Day A: Power + Back', exercises: [
+  A: { key: 'A', day: 'Monday', title: 'Session 1', focus: 'Power + Back', exercises: [
     { id: 'A1', group: 'explosive', parts: ['Med-ball slam'], sets: 3, min: 5, max: 5, rest: 60, swap: { label: 'Kettlebell swing 3 \u00d7 8', parts: ['Kettlebell swing'], sets: 3, min: 8, max: 8 } },
     { id: 'A2', group: 'explosive', parts: ['Broad jump'], sets: 3, min: 3, max: 3, rest: 60, swap: { label: 'Box jump 3 \u00d7 3', parts: ['Box jump'] } },
     { id: 'A3', group: 'main', main: true, parts: ['Trap bar deadlift'], sets: 3, min: 6, max: 8, rest: 120, swap: { label: 'Conventional deadlift', parts: ['Conventional deadlift'] } },
@@ -85,7 +85,7 @@ const PROGRAM = {
     { id: 'A8', group: 'finisher', superset: true, parts: ['Neck curl', 'Neck extension'], sets: 2, min: 15, max: 15, each: 'each', rest: 45, swap: { label: 'Plate-loaded neck harness', parts: ['Plate-loaded neck harness'] } },
     { id: 'A9', group: 'finisher', parts: ['Dead hang'], sets: 1, maxTime: true, rest: 0, swap: { label: 'Farmer hold', parts: ['Farmer hold'] } }
   ]},
-  B: { key: 'B', day: 'Wednesday', title: 'Day B: Legs + Chest', exercises: [
+  B: { key: 'B', day: 'Wednesday', title: 'Session 2', focus: 'Legs + Chest', exercises: [
     { id: 'B1', group: 'explosive', parts: ['Box jump'], sets: 3, min: 3, max: 3, rest: 60, swap: { label: 'Squat jump', parts: ['Squat jump'] } },
     { id: 'B2', group: 'explosive', parts: ['Med-ball chest pass'], sets: 3, min: 5, max: 5, rest: 60, swap: { label: 'Explosive push-up', parts: ['Explosive push-up'] } },
     { id: 'B3', group: 'main', main: true, parts: ['Back squat'], sets: 3, min: 6, max: 8, rest: 120, swap: { label: 'Leg press or hack squat', parts: ['Leg press or hack squat'] } },
@@ -96,7 +96,7 @@ const PROGRAM = {
     { id: 'B8', group: 'muscle', parts: ['Standing calf raise'], sets: 3, min: 15, max: 20, rest: 60, swap: { label: 'Seated calf raise', parts: ['Seated calf raise'] } },
     { id: 'B9', group: 'muscle', parts: ['Hanging knee raise'], sets: 3, min: 10, max: 12, rest: 60, swap: { label: 'Cable crunch', parts: ['Cable crunch'] } }
   ]},
-  C: { key: 'C', day: 'Friday', title: 'Day C: Shoulders + Arms', exercises: [
+  C: { key: 'C', day: 'Friday', title: 'Session 3', focus: 'Shoulders + Arms', exercises: [
     { id: 'C1', group: 'explosive', parts: ['Med-ball rotational throw'], sets: 3, min: 5, max: 5, each: 'each side', rest: 60, swap: { label: 'Cable woodchop (fast)', parts: ['Cable woodchop (fast)'] } },
     { id: 'C2', group: 'explosive', parts: ['Lateral bound'], sets: 3, min: 3, max: 3, each: 'each side', rest: 60, swap: { label: 'Skater hop', parts: ['Skater hop'] } },
     { id: 'C3', group: 'main', main: true, parts: ['Military press'], sets: 3, min: 6, max: 8, rest: 120, swap: { label: 'Seated DB shoulder press', parts: ['Seated DB shoulder press'] } },
@@ -113,8 +113,8 @@ const PROGRAM = {
 // Weekday (0 = Sun) -> session
 const WEEK = { 0: 'R', 1: 'A', 2: 'R', 3: 'B', 4: 'R', 5: 'C', 6: 'H' };
 const WEEK_TABLE = [
-  ['Monday', 'Day A: Power + Back'], ['Tuesday', 'Recovery (walk, sun, surf)'], ['Wednesday', 'Day B: Legs + Chest'],
-  ['Thursday', 'Recovery'], ['Friday', 'Day C: Shoulders + Arms'], ['Saturday', 'Fighter HIIT (20 min)'], ['Sunday', 'Recovery']
+  ['Monday', 'Session 1 · Power + Back'], ['Tuesday', 'Recovery (walk, sun, surf)'], ['Wednesday', 'Session 2 · Legs + Chest'],
+  ['Thursday', 'Recovery'], ['Friday', 'Session 3 · Shoulders + Arms'], ['Saturday', 'HIIT · Fighter HIIT (20 min)'], ['Sunday', 'Recovery']
 ];
 
 const HIIT = {
@@ -129,3 +129,70 @@ const HIIT = {
 const NUTRITION = { kcal: 2500, protein: 175, carbs: 220, fat: 100 };
 
 const GROUP_LABEL = { explosive: 'Explosive: fast and fresh', main: 'Main lifts', muscle: 'Muscle work', finisher: 'Finisher: neck and grip' };
+
+/* Demo videos (YouTube, embedded via youtube-nocookie on tap). Every ID was checked on 1 Oct 2026:
+   oEmbed returned 200 with the title/channel below, and the watch page reported playable + embeddable. */
+const VIDEO = {
+  "Med-ball slam": { id: "QxYhFwMd1Ks", title: "How to Perform the Med Ball Slam", ch: "CORE Strong Fitness", secs: 43 },
+  "Kettlebell swing": { id: "YSxHifyI6s8", title: "Kettlebell Swing", ch: "Men's Health", secs: 118 },
+  "Broad jump": { id: "XqpN9AbLMe4", title: "Broad Jump Technique", ch: "VelocityMTP", secs: 75 },
+  "Box jump": { id: "hxldG9FX4j4", title: "How To: Box Jump", ch: "ScottHermanFitness", secs: 163 },
+  "Trap bar deadlift": { id: "WzvsIU9FW60", title: "Trap Bar Deadlifts (How to)", ch: "Trainer Hub", secs: 158 },
+  "Conventional deadlift": { id: "r4MzxtBKyNE", title: "How To Perfect Your Deadlift | Form Check | Men's Health", ch: "Men's Health", secs: 184 },
+  "Weighted pull-up": { id: "HuuyDNGrCI8", title: "How To: Weighted Pull-Up", ch: "ScottHermanFitness", secs: 112 },
+  "Wide-grip lat pulldown": { id: "lueEJGjTuPQ", title: "Wide-Grip Lat Pulldown | Back Exercise Guide", ch: "Bodybuilding.com", secs: 64 },
+  "Incline DB press": { id: "8iPEnn-ltC8", title: "How To: Dumbbell Incline Chest Press", ch: "ScottHermanFitness", secs: 162 },
+  "Incline barbell or machine press": { id: "11gY7Q5D5wo", title: "How to Do an Incline Barbell Bench Press", ch: "LIVESTRONG", secs: 94 },
+  "DB lateral raise": { id: "3VcKaXpzqRo", title: "How To: Dumbbell Side Lateral Raise", ch: "ScottHermanFitness", secs: 115 },
+  "Cable lateral raise": { id: "Z5FA9aq3L6A", title: "How To Do Cable Lateral Raises", ch: "PureGym", secs: 15 },
+  "Hammer curl": { id: "zC3nLlEvin4", title: "How To: Dumbbell Hammer Curl", ch: "ScottHermanFitness", secs: 122 },
+  "Skull-crusher": { id: "d_KZxkY_0cM", title: "How To: Skull Crushers", ch: "ScottHermanFitness", secs: 154 },
+  "Rope hammer curl": { id: "1Quc_tOv97I", title: "How To: Rope Hammer Curl", ch: "ScottHermanFitness", secs: 88 },
+  "Overhead DB extension": { id: "-Vyt2QdsR7E", title: "How To: Standing Overhead Dumbbell Tricep Extension", ch: "ScottHermanFitness", secs: 102 },
+  "Neck curl": { id: "o78kjeBJUBQ", title: "How To: Weight Plate Neck Curl", ch: "Live Lean TV Daily Exercises", secs: 74 },
+  "Neck extension": { id: "hYqVUHC-GhE", title: "How To: Weight Plate Neck Extension", ch: "Live Lean TV Daily Exercises", secs: 51 },
+  "Plate-loaded neck harness": { id: "VLdIkr2Gfdc", title: "How To: Seated Head Harness Neck Extension", ch: "Live Lean TV Daily Exercises", secs: 72 },
+  "Dead hang": { id: "PlAE67ovNEo", title: "How To Dead Hang (4 Variations Covered)", ch: "Gymless Fitness", secs: 312 },
+  "Farmer hold": { id: "Xt7ocQZ0VrA", title: "Farmer's Hold (kettlebells)", ch: "Weightlifting 101", secs: 9 },
+  "Squat jump": { id: "DeTBwEL4m7s", title: "How To: Squat Jump", ch: "ScottHermanFitness", secs: 81 },
+  "Med-ball chest pass": { id: "e-zHTwXA8mE", title: "Standing Medicine Ball Chest Pass - Viking Strength Systems", ch: "Viking Strength Systems", secs: 43 },
+  "Explosive push-up": { id: "3wcAlTa6CIs", title: "How To: Explosive Plyo Push-Up", ch: "ScottHermanFitness", secs: 145 },
+  "Back squat": { id: "SW_C1A-rejs", title: "How To: Deep Barbell Back Squat", ch: "ScottHermanFitness", secs: 155 },
+  "Leg press or hack squat": { id: "IZxyjW7MPJQ", title: "How To: Seated Leg Press (Cybex)", ch: "ScottHermanFitness", secs: 155 },
+  "Incline barbell bench": { id: "11gY7Q5D5wo", title: "How to Do an Incline Barbell Bench Press", ch: "LIVESTRONG", secs: 94 },
+  "Flat DB bench": { id: "VmB1G1K7v94", title: "How To: Dumbbell Chest Press", ch: "ScottHermanFitness", secs: 130 },
+  "Barbell row": { id: "9efgcAjQe7E", title: "How To: Barbell Bent-Over Row", ch: "ScottHermanFitness", secs: 185 },
+  "Chest-supported DB row": { id: "H75im9fAUMc", title: "Chest-Supported Row", ch: "Men's Health", secs: 128 },
+  "Walking lunge": { id: "eFWCn5iEbTU", title: "Dumbbell Walking Lunge", ch: "Renaissance Periodization", secs: 10 },
+  "Bulgarian split squat": { id: "2C-uNgKwPLE", title: "How To: Bulgarian Split Squat", ch: "ScottHermanFitness", secs: 175 },
+  "Dips": { id: "4la6BkUBLgo", title: "Dips   Chest Version - Chest Exercise - Bodybuilding.com", ch: "Bodybuilding.com", secs: 37 },
+  "Close-grip bench": { id: "nEF0bv2FW94", title: "How To: Close-Grip Barbell Bench Press", ch: "ScottHermanFitness", secs: 95 },
+  "Standing calf raise": { id: "-M4-G8p8fmc", title: "How to Do a Calf Raise | Sexy Legs Workout", ch: "Howcast", secs: 110 },
+  "Seated calf raise": { id: "JbyjNymZOt0", title: "How to Do Seated Calf Raises", ch: "LIVESTRONG", secs: 119 },
+  "Hanging knee raise": { id: "RD_A-Z15ER4", title: "Hanging Knee Raise", ch: "Renaissance Periodization", secs: 9 },
+  "Cable crunch": { id: "3qjoXDTuyOE", title: "Cable Crunch - Abs / Core Exercise - Bodybuilding.com", ch: "Bodybuilding.com", secs: 49 },
+  "Med-ball rotational throw": { id: "o9BC7lgN1bo", title: "How To Do A STANDING MEDICINE BALL ROTATIONAL THROW AGAINST A WALL | Exercise Demonstration Video", ch: "Live Lean TV Daily Exercises", secs: 45 },
+  "Cable woodchop (fast)": { id: "pAplQXk3dkU", title: "How To: Oblique Twist \"Wood Chopper\" (LF CAble)", ch: "ScottHermanFitness", secs: 193 },
+  "Lateral bound": { id: "Hc9_FQgIeeg", title: "Lateral Bound", ch: "Nick Brattain", secs: 75 },
+  "Skater hop": { id: "9_jLW6VkU8A", title: "Speed Skaters Exercise (Skater Hops): Proper Form", ch: "BuiltLean\u00ae", secs: 68 },
+  "Military press": { id: "2yjwXTZQDDI", title: "How To: Standing Straight-Bar Military / Overhead Press", ch: "ScottHermanFitness", secs: 168 },
+  "Seated DB shoulder press": { id: "qEwKCR5JCog", title: "How To: Dumbbell Shoulder Press", ch: "ScottHermanFitness", secs: 144 },
+  "Romanian deadlift": { id: "3VXmecChYYM", title: "How to do the ROMANIAN DEADLIFT! | 2 Minute Tutorial", ch: "Max Euceda", secs: 119 },
+  "DB RDL or lying leg curl": { id: "FQKfr1YDhEk", title: "How To: Dumbbell Romanian Deadlift", ch: "ScottHermanFitness", secs: 118 },
+  "Close-grip cable row": { id: "vwHG9Jfu4sw", title: "How to do the SEATED CABLE ROW! | 2 Minute Tutorial", ch: "Max Euceda", secs: 120 },
+  "Seated machine row": { id: "TeFo51Q_Nsc", title: "How To Use The Seated Row Machine", ch: "PureGym", secs: 60 },
+  "Rear delt fly": { id: "EA7u4Q_8HQ0", title: "Dumbbell Rear Delt Flye - The Proper Lift - BPI Sports", ch: "BPI Sports", secs: 96 },
+  "Shrug": { id: "NAqCVe2mwzM", title: "How to Do a Standing Barbell Shrug | Back Workout", ch: "Howcast", secs: 130 },
+  "Face pull": { id: "rep-qVOkqgk", title: "How To: Face Pull", ch: "ScottHermanFitness", secs: 162 },
+  "DB shrug": { id: "cJRVVxmytaM", title: "How To: Dumbbell Shrugs", ch: "ScottHermanFitness", secs: 101 },
+  "Incline DB curl": { id: "soxrZlIl35U", title: "How To: Seated Incline Dumbbell Bicep Curl", ch: "ScottHermanFitness", secs: 105 },
+  "Rope pushdown": { id: "vB5OHsJ3EME", title: "How To: Rope Push-Down", ch: "ScottHermanFitness", secs: 93 },
+  "EZ bar curl": { id: "6LrOTcr595A", title: "EZ Bar Curls How To Perform Them Correctly", ch: "KAGED ", secs: 102 },
+  "Overhead cable extension": { id: "1u18yJELsh0", title: "Cable Overhead Triceps Extension", ch: "Renaissance Periodization", secs: 12 },
+  "Reverse curl": { id: "nRgxYX2Ve9w", title: "How to Do a Reverse Curl | Arm Workout", ch: "Howcast", secs: 108 },
+  "Wrist roller": { id: "-lOFG0U_rlY", title: "Wrist Roller - Forearm Exercise - Bodybuilding.com", ch: "Bodybuilding.com", secs: 40 },
+  "Farmer carry": { id: "NH7Xv-7NQNQ", title: "How To Perform Farmer Walks Exercise Tutorial", ch: "Buff Dudes Workouts", secs: 90 },
+  "Trap bar hold": { id: "df-MeZsxCAM", title: "Trap Bar Farmers Carry", ch: "John Rusin", secs: 23, note: "Trap bar carry: same pick-up and grip, just stand still and hold" }
+};
+
+const APP_NAME = 'Baki Training App';
