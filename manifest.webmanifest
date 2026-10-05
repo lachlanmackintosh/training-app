@@ -1,7 +1,7 @@
 {
   "name": "Lockie Training Program",
   "short_name": "Lockie Training",
-  "description": "Baki Program: 3 gym sessions, HIIT menu, daily mobility, logger, timers and demo videos.",
+  "description": "Baki Program: 3 gym sessions, HIIT menu, daily mobility, meals and shopping list, logger, timers and demo videos.",
   "lang": "en-AU",
   "start_url": "./index.html#/home",
   "scope": "./",

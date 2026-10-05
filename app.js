@@ -1,12 +1,19 @@
 /* Baki Program (Lockie Training Program) — plain JS, no build step. Data in data.js. */
 (() => {
 'use strict';
-const LS = { log: 'lockie.log.v1', draft: 'lockie.draft.v1', settings: 'lockie.settings.v1', timer: 'lockie.timer.v1' };
+const LS = { log: 'lockie.log.v1', draft: 'lockie.draft.v1', settings: 'lockie.settings.v1', timer: 'lockie.timer.v1', food: 'lockie.food.v1' };
 const DEFAULT_SETTINGS = { start: '2026-10-05', rampEveryBlock: true, deload: false, swaps: {} };
 const $ = (s, el = document) => el.querySelector(s);
 const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const load = (k, d) => { try { const v = JSON.parse(localStorage.getItem(k)); return v == null ? d : v; } catch { return d; } };
 const save = (k, v) => localStorage.setItem(k, JSON.stringify(v));
+const comma = n => String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+function foodState() {
+  const v = load(LS.food, {});
+  const checks = v && v.checks && typeof v.checks === 'object' && !Array.isArray(v.checks) ? v.checks : {};
+  return { carb: v && v.carb === 'sweet' ? 'sweet' : 'rice', checks };
+}
+function saveFood(st) { save(LS.food, st); }
 
 let settings = Object.assign({}, DEFAULT_SETTINGS, load(LS.settings, {}));
 let log = load(LS.log, []);
@@ -208,6 +215,7 @@ function renderHome() {
   }
   const mk = mobKeyFor(d), mo = MOBILITY[mk];
   const n = NUTRITION;
+  const food = foodState(), ft = FOOD.totals[food.carb];
   view().innerHTML = `
   <div class="row between"><div><div class="muted small">${esc(fmtLong(d))}</div><h1 class="apph">${esc(APP_HEADING)}</h1></div>
     <a class="iconbtn" href="#/settings" aria-label="Settings">⚙️</a></div>
@@ -218,6 +226,11 @@ function renderHome() {
     <div style="margin-top:4px;font-weight:700;font-size:17px">${esc(mo.name)}</div>
     <div class="muted small">${esc(mo.moves.slice(0, 4).map(x => x[0]).join(' · '))} …</div>
     <a class="btn ghost" style="margin-top:10px" href="#/mobility/${mk}">Start mobility</a></div>
+  <div class="card foodcard"><div class="row between"><b>Today's meals</b><span class="muted small">${food.carb === 'rice' ? 'Rice day' : 'Sweet-potato day'}</span></div>
+    <div style="margin-top:4px;font-weight:700;font-size:17px">Yoghurt bowl · Egg meal · Protein bowl</div>
+    <div class="muted small">~${comma(ft.kcal)} kcal · ${ft.p} g protein on this day. The target board below is still 2,500 kcal.</div>
+    <a class="btn ghost" style="margin-top:10px" href="#/food">Open meals</a>
+    <a class="small" style="display:inline-block;margin-top:8px;min-height:36px;line-height:36px" href="#/food/shop">Shopping list</a></div>
   <div class="card"><div class="row between"><b>Nutrition: daily targets</b><span class="muted small">every day</span></div>
     <div class="grid4" style="margin-top:10px">
       <div class="stat"><b>${n.kcal}</b><span>kcal</span></div><div class="stat"><b>${n.protein}</b><span>g protein</span></div>
@@ -550,6 +563,111 @@ function renderHistory(m) {
       <div class="grid2"><button class="btn ghost" data-act="export">Export JSON</button><button class="btn ghost" data-act="import">Import JSON</button></div></div>`;
 }
 
+/* ---------- food ---------- */
+function macroLine(m) {
+  return `<div class="macros"><b>~${comma(m.kcal)} kcal</b><span>${m.p} g protein · ${m.c} g carbs · ${m.f} g fat</span></div>`;
+}
+function portionsHtml(items) {
+  return `<ul class="portions">${items.map(it => {
+    const cls = [it.optional ? 'opt' : '', it.carb ? 'carb' : ''].filter(Boolean).join(' ');
+    return `<li class="${cls}">${it.optional ? 'Optional, uncounted: ' : ''}${esc(it.text)}</li>`;
+  }).join('')}</ul>`;
+}
+function mealCard(meal, n) {
+  return `<div class="card"><h3>${n ? n + ' · ' : ''}${esc(meal.name)}</h3>${macroLine(meal)}${portionsHtml(meal.items)}</div>`;
+}
+function foodSeg(mode) {
+  return `<div class="seg foodseg">
+    <button type="button" class="${mode === 'meals' ? 'on' : ''}" data-act="food-view" data-v="meals">Meals</button>
+    <button type="button" class="${mode === 'shop' ? 'on' : ''}" data-act="food-view" data-v="shop">Shopping</button>
+  </div>`;
+}
+function shopStats(checks) {
+  let total = 0, done = 0;
+  for (const g of SHOP) for (const [id] of g.items) { total++; if (checks[id]) done++; }
+  return { total, done };
+}
+function renderShop() {
+  const st = foodState(), { total, done } = shopStats(st.checks);
+  const groups = SHOP.map(g => {
+    const items = g.items.map(([id, text]) => {
+      const on = !!st.checks[id];
+      return `<label class="check${on ? ' on' : ''}"><input type="checkbox" data-shop="${esc(id)}"${on ? ' checked' : ''}><span>${esc(text)}</span></label>`;
+    }).join('');
+    return `<div class="group-h">${esc(g.title)}</div><div class="card" style="margin-top:4px">${g.note ? `<div class="muted small">${esc(g.note)}</div>` : ''}${items}</div>`;
+  }).join('');
+  return `<div class="row between" style="margin-top:14px"><div><b id="shop-count">${done} of ${total} ticked</b>
+      <div class="muted small">Buy the calculated base first. Alternatives are swaps, not extras.</div></div></div>
+    <button class="btn ghost" style="margin-top:10px" data-act="shop-reset">Reset for new week</button>
+    ${groups}`;
+}
+function microHtml() {
+  const m = FOOD.micros;
+  const rows = m.rows.map(r => {
+    const warn = r[4].indexOf('Gap') === 0 || r[2] === 'Unresolved' || r[3] === 'Unresolved';
+    return `<div class="micron"><div class="row between"><b>${esc(r[0])}</b><span class="small ${warn ? 'gap' : 'muted'}">${esc(r[4])}</span></div>
+      <div class="muted small">Guide ${esc(r[1])} · Rice ${esc(r[2])} · Sweet potato ${esc(r[3])}</div></div>`;
+  }).join('');
+  return `<div class="card"><b>Micronutrients</b>
+    <div class="muted small" style="margin-top:4px">Likely covered against the Sillz guide. These are estimates, not lab results.</div>
+    <div class="chips">${m.covered.map(c => `<span class="chip">${esc(c)}</span>`).join('')}</div>
+    <div class="group-h">Gaps</div>
+    <ul class="bul small">
+      <li><b class="gap">Vitamin E</b> — about 10–11 mg on both days, against a 15 mg guide. Roughly 4–5 mg short.</li>
+      <li><b class="gap">Magnesium</b> — rice day 335 mg (about 65 mg short). Sweet-potato day 393 mg (about 7 mg short). Guide 400 mg.</li>
+      <li><b>Vitamin D, B6 and K2</b> — unresolved. A blank here is not zero intake.</li>
+      <li><b>Omega-3</b> — salmon in the protein bowl about twice a week. No daily sardines in this plan.</li>
+    </ul>
+    <div class="muted small">Iodine about 275 µg on a rice day and 270 µg on a sweet-potato day (dairy-dependent). Fibre about 28 g rice / 37 g sweet potato.</div>
+    <details class="micro-more"><summary>Full comparison</summary>
+      ${rows}
+      <ul class="bul small">${m.footnotes.map(f => `<li>${esc(f)}</li>`).join('')}</ul>
+    </details></div>`;
+}
+function renderMeals(carb) {
+  const bowl = FOOD.bowl, spec = bowl[carb], other = carb === 'rice' ? 'sweet' : 'rice';
+  const items = [bowl.items[0], { text: spec.carb, carb: true }, ...bowl.items.slice(1)];
+  const totals = ['rice', 'sweet'].map(k => {
+    const t = FOOD.totals[k], on = k === carb;
+    return `<div class="dayrow${on ? ' on' : ''}"><div class="row between"><b>${k === 'rice' ? 'Rice day' : 'Sweet-potato day'}</b>${on ? '<span class="chip">Selected</span>' : ''}</div>
+      <div class="grid4" style="margin-top:8px">
+        <div class="stat"><b>~${comma(t.kcal)}</b><span>kcal</span></div>
+        <div class="stat"><b>${t.p}</b><span>g protein</span></div>
+        <div class="stat"><b>${t.c}</b><span>g carbs</span></div>
+        <div class="stat"><b>${t.f}</b><span>g fat</span></div>
+      </div></div>`;
+  }).join('');
+  return `<div class="seg">
+      <button type="button" class="${carb === 'rice' ? 'on' : ''}" data-act="carb" data-v="rice">Rice day</button>
+      <button type="button" class="${carb === 'sweet' ? 'on' : ''}" data-act="carb" data-v="sweet">Sweet-potato day</button>
+    </div>
+    ${FOOD.meals.map((meal, i) => mealCard(meal, i + 1)).join('')}
+    <div class="card"><div class="row between"><h3>3 · ${esc(bowl.name)}</h3><span class="muted small">${carb === 'rice' ? 'Rice' : 'Sweet potato'}</span></div>
+      ${macroLine(spec)}
+      ${portionsHtml(items)}
+      <div class="muted small" style="margin-top:8px">Other day: ${esc(bowl[other].carb)}</div>
+      <div class="note">${esc(bowl.note)}</div>
+    </div>
+    ${mealCard(FOOD.extras)}
+    <div class="card"><b>Day totals</b>
+      <div class="muted small" style="margin-top:4px">Calculated meals. Each line is rounded on its own, so the meals may not add exactly to these totals.</div>
+      ${totals}
+      <div class="muted small" style="margin-top:10px">${esc(FOOD.optionalRice)}</div>
+    </div>
+    ${microHtml()}
+    <div class="card"><b>How to eat this</b><ul class="bul small">${FOOD.rules.map(r => `<li>${esc(r)}</li>`).join('')}</ul></div>`;
+}
+function renderFood(arg) {
+  const mode = arg === 'shop' ? 'shop' : 'meals';
+  view().innerHTML = `<div class="row between"><h1 style="margin:0">Food</h1><span class="muted small">Locked ${esc(FOOD.locked)}</span></div>
+    <div class="muted small" style="margin-top:4px">${esc(FOOD.board)}</div>
+    ${foodSeg(mode)}
+    ${mode === 'shop' ? renderShop() : renderMeals(foodState().carb)}`;
+}
+function foodArg() {
+  return (location.hash.replace(/^#\/?/, '').split('/')[1]) || '';
+}
+
 function renderRules() {
   view().innerHTML = `<h1>The Rules</h1>
   <div class="card"><h3>Effort</h3><ul class="bul">
@@ -634,6 +752,15 @@ document.addEventListener('input', e => {
 });
 document.addEventListener('change', e => {
   if (e.target.dataset && e.target.dataset.act === 'short') { ui.short = e.target.checked; renderWorkout(view().dataset.day); }
+  if (e.target.dataset && e.target.dataset.shop) {
+    const st = foodState(), id = e.target.dataset.shop;
+    if (e.target.checked) st.checks[id] = true; else delete st.checks[id];
+    saveFood(st);
+    const lab = e.target.closest('.check');
+    if (lab) lab.classList.toggle('on', e.target.checked);
+    const { total, done } = shopStats(st.checks);
+    const n = $('#shop-count'); if (n) n.textContent = `${done} of ${total} ticked`;
+  }
 });
 document.addEventListener('click', e => {
   const b = e.target.closest('[data-act]'); if (!b) return;
@@ -667,7 +794,16 @@ document.addEventListener('click', e => {
   else if (act === 'hiit-reset') pReset();
   else if (act === 'hiit-skip') { unlockAudio(); pNext(false); }
   else if (act === 'mob-prev') { unlockAudio(); pPrev(); }
-  else if (act === 'export') exportLog();
+  else if (act === 'food-view') go(b.dataset.v === 'shop' ? '#/food/shop' : '#/food');
+  else if (act === 'carb') {
+    const st = foodState(); st.carb = b.dataset.v === 'sweet' ? 'sweet' : 'rice'; saveFood(st);
+    const y = scrollY; renderFood(foodArg()); scrollTo(0, y);
+  } else if (act === 'shop-reset') {
+    const st = foodState();
+    if (!Object.keys(st.checks).length) { toast('Nothing to clear'); return; }
+    if (!confirm('Clear every tick for a new week?')) return;
+    st.checks = {}; saveFood(st); renderFood('shop'); scrollTo(0, 0); toast('Shopping list cleared');
+  } else if (act === 'export') exportLog();
   else if (act === 'import') importLog();
   else if (act === 'finish') { const n = log.filter(x => x.d === todayStr()).length; toast(n ? `Session saved: ${n} sets. Be better, not perfect.` : 'No sets ticked today'); }
 });
@@ -676,12 +812,13 @@ document.addEventListener('click', e => {
 function go(h) { location.hash = h; }
 function route() {
   const h = location.hash.replace(/^#\/?/, '') || 'home', [p, arg] = h.split('/');
-  const tab = { home: 'home', workout: 'home', settings: 'home', program: 'program', hiit: 'hiit', mobility: 'mobility', history: 'history', rules: 'rules' }[p] || 'home';
+  const tab = { home: 'home', workout: 'home', settings: 'home', program: 'program', hiit: 'hiit', mobility: 'mobility', food: 'food', history: 'history', rules: 'rules' }[p] || 'home';
   document.querySelectorAll('.tabs a').forEach(a => a.classList.toggle('on', a.dataset.tab === tab));
   if (p === 'workout') renderWorkout(arg);
   else if (p === 'program') renderProgram();
   else if (p === 'hiit') arg ? renderHIITSession(arg) : renderHIIT();
   else if (p === 'mobility') arg ? renderMobSession(arg) : renderMobility();
+  else if (p === 'food') renderFood(arg);
   else if (p === 'history') renderHistory(arg ? decodeURIComponent(arg) : null);
   else if (p === 'rules') renderRules();
   else if (p === 'settings') renderSettings();

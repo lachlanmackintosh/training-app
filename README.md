@@ -1,7 +1,7 @@
 # Lockie Training Program (PWA)
 
 Shows as "Baki Program" inside the app. A mobile-first, offline-capable web app for a 3-session full body + fighter HIIT plan,
-with tempo cues, a HIIT menu with interval timers, and a guided daily mobility session. Plain HTML/CSS/JS with no build step, hosted on GitHub Pages.
+with tempo cues, a HIIT menu with interval timers, a guided daily mobility session, and a Food tab (locked daily meals plus a weekly shopping checklist). Plain HTML/CSS/JS with no build step, hosted on GitHub Pages.
 
 - `data.js`: the plan (sessions, exercises, sets × reps, rest, swaps, tempo, cues), HIIT menu + weekly rotation, mobility sessions, nutrition targets, demo video IDs
 - `app.js`, `styles.css`, `index.html`: the app
