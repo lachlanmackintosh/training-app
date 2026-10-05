@@ -222,7 +222,7 @@ const FOOD = {
   ],
   bowl: {
     name: 'Protein bowl',
-    note: 'Twice a week: swap the mince for salmon and recalculate that day.',
+    note: 'Stretch swap only: wild-caught salmon when it is affordable. Recalculate that day. No sardines. An omega-3 supplement covers long-chain fats when you skip salmon.',
     rice: { kcal: 930, p: 61, c: 109, f: 25, carb: '300 g cooked white rice' },
     sweet: { kcal: 735, p: 58, c: 61, f: 25, carb: '350 g cooked orange sweet potato' },
     items: [
@@ -247,7 +247,7 @@ const FOOD = {
   optionalRice: 'Optional: add 150 g cooked rice on a sweet-potato day for about 2,700 kcal and 180 g protein.',
   rules: [
     'Same three meals every day. Rice vs sweet potato is the day switch.',
-    'Salmon in the protein bowl about twice a week.',
+    'No sardines. Salmon is a stretch swap only when it is affordable and wild-caught. Use an omega-3 supplement for long-chain fats when you skip it.',
     'No seed oils, vegetable oils, artificials, or undisclosed labels.',
     'Prefer certified organic berries and grass-finished beef where practical.',
     'Food first for vitamin E and magnesium. Magnesium glycinate at night only if rice days stay short.',
@@ -287,7 +287,7 @@ const FOOD = {
       'Vitamin D, B6 and K2 are unresolved. Unresolved is not zero. K2\u2019s 200 µg is a guide comparison, not an established separate requirement.',
       'B1 leaves out bread thiamin until the brand is confirmed. Copper totals are partial. K1 is likely covered and was not quantified.',
       'Iodine about 275 µg on rice days and 270 µg on sweet-potato days (dairy-dependent). Fibre about 28 g rice / 37 g sweet potato.',
-      'Omega-3 needs salmon in the protein bowl about twice a week. No daily sardines in this plan.',
+      'Omega-3: no sardines. Salmon is a stretch swap only when it is affordable and wild-caught. An omega-3 supplement covers long-chain fats when you skip salmon.',
       'Working estimates against the Sillz guide, not a lab export. Missing values are not zero.'
     ]
   }
@@ -302,7 +302,6 @@ const SHOP = [
     ['cottage', 'Full-fat cottage cheese — 700 g'],
     ['milk', 'Full-fat milk — 1.75 L (pasteurised organic / A2; goat or kefir = recalculate)'],
     ['mince', 'Lean grass-fed grass-finished beef mince — 1.26 kg raw (steak day ok as swap)'],
-    ['salmon', 'Salmon — for about 2 protein bowls this week'],
     ['cheddar', 'Cheddar — 140 g (Parmesan / gorgonzola ok)']
   ]},
   { title: 'Carbs and produce', items: [
@@ -326,6 +325,8 @@ const SHOP = [
     ['salt', 'Salt with batch metal testing if you can find it']
   ]},
   { title: 'Stretch / rotation', note: 'Not the daily base.', items: [
+    ['salmon', 'Wild-caught salmon — only when affordable (stretch swap for mince)'],
+    ['omega', 'Omega-3 supplement — long-chain fats on weeks you skip salmon'],
     ['proteins', 'Optional protein: cod, venison, bison, chicken thighs'],
     ['pom', 'Organic pomegranates / pomegranate juice / tart-cherry juice'],
     ['ghee', 'Ghee or beef tallow for cooking (count the fat)'],

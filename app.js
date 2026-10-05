@@ -616,7 +616,7 @@ function microHtml() {
       <li><b class="gap">Vitamin E</b> — about 10–11 mg on both days, against a 15 mg guide. Roughly 4–5 mg short.</li>
       <li><b class="gap">Magnesium</b> — rice day 335 mg (about 65 mg short). Sweet-potato day 393 mg (about 7 mg short). Guide 400 mg.</li>
       <li><b>Vitamin D, B6 and K2</b> — unresolved. A blank here is not zero intake.</li>
-      <li><b>Omega-3</b> — salmon in the protein bowl about twice a week. No daily sardines in this plan.</li>
+      <li><b>Omega-3</b> — no sardines. Salmon only when it is affordable and wild-caught. An omega-3 supplement covers long-chain fats when you skip salmon.</li>
     </ul>
     <div class="muted small">Iodine about 275 µg on a rice day and 270 µg on a sweet-potato day (dairy-dependent). Fibre about 28 g rice / 37 g sweet potato.</div>
     <details class="micro-more"><summary>Full comparison</summary>
