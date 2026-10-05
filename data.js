@@ -198,64 +198,100 @@ const EFFORT = [
 
 const NUTRITION = { kcal: 2500, protein: 175, carbs: 220, fat: 100 };
 
-/* Locked meals, 6 Oct 2026. Portions and macros from the meal plan.
-   Micronutrient figures are estimates vs the Sillz guide (handover table), not lab results.
-   Meal lines are rounded on their own, so they may not add exactly to the day totals. */
+/* Meals, 6 Oct 2026, with in-meal swaps. No rice-day / sweet-potato-day mode.
+   Default macros start from the locked board, then two portion edits:
+   - Egg bread is 2 slices counted at 120 g, not a fixed 125 g blob: −10 kcal, −2 g carbs.
+   - A second ½ avocado (about 60 g flesh) is on the bowl or steak plate.
+     USDA-style Hass, rounded: +95 kcal, +1 g protein, +5 g carbs, +9 g fat.
+     The egg-meal half was already inside the locked 930 kcal line.
+   Protein and honey deltas are generic AFCD/USDA-style differences vs that plate.
+   Rounded. Not a lab assay. Micros stay coarse on purpose. */
 const FOOD = {
   locked: '6 Oct 2026',
-  board: 'Locked macro board is still about 2,500 kcal until body measurements are set.',
-  meals: [
-    { name: 'Yoghurt bowl', kcal: 640, p: 52, c: 41, f: 29, items: [
-      { text: '300 g Jalna organic full-fat Greek-style yoghurt' },
-      { text: '50 g Chief unflavoured whey' },
-      { text: '200 g organic berries (100 g strawberries, 50 g blueberries, 50 g raspberries)' },
-      { text: '15 g maple syrup' },
-      { text: 'Ceylon cinnamon, bee pollen', optional: true }
-    ]},
-    { name: 'Egg meal', kcal: 930, p: 62, c: 71, f: 42, items: [
+  board: 'Locked macro board is still about 2,500 kcal until body measurements are set. Totals below follow the swaps you pick.',
+  estimate: 'Estimates. Locked 6 Oct meals, plus generic AFCD/USDA-style values for each swap (Jalna and Chief-style labels where a product is named). Rounded. Not a lab result.',
+  defaults: { sweetener: 'maple', meal3: 'bowl', protein: 'mince', carb: 'rice' },
+  sweeteners: {
+    maple: { name: 'Maple', portion: '15 g maple syrup', macros: { kcal: 640, p: 52, c: 41, f: 29 } },
+    honey: { name: 'Honey', portion: '15 g honey', macros: { kcal: 645, p: 52, c: 43, f: 29 } }
+  },
+  yoghurtItems: [
+    { text: '300 g Jalna organic full-fat Greek-style yoghurt' },
+    { text: '50 g Chief unflavoured whey' },
+    { text: '200 g organic berries (100 g strawberries, 50 g blueberries, 50 g raspberries)' }
+  ],
+  mixins: 'Ceylon cinnamon and bee pollen, stirred into the sweetener',
+  egg: {
+    name: 'Egg meal',
+    /* Locked line was 930 kcal, 62 g protein, 71 g carbs, 42 g fat with 125 g bread and 60 g avocado. */
+    macros: { kcal: 920, p: 62, c: 69, f: 42 },
+    items: [
       { text: '4 eggs (~200 g edible before cooking)' },
       { text: '100 g full-fat cottage cheese' },
-      { text: '125 g organic sourdough (before toasting)' },
-      { text: '60 g avocado flesh' },
+      { text: '2 slices organic sourdough (about 55–62 g each, 110–125 g before toasting; counted at 120 g)', picked: true },
+      { text: '½ avocado (about 50–70 g flesh; counted at 60 g)', picked: true },
       { text: '250 mL full-fat pasteurised / A2 cow milk' }
-    ]}
-  ],
-  bowl: {
-    name: 'Protein bowl',
-    note: 'Stretch swap only: wild-caught salmon when it is affordable. Recalculate that day. No sardines. An omega-3 supplement covers long-chain fats when you skip salmon.',
-    rice: { kcal: 930, p: 61, c: 109, f: 25, carb: '300 g cooked white rice' },
-    sweet: { kcal: 735, p: 58, c: 61, f: 25, carb: '350 g cooked orange sweet potato' },
-    items: [
-      { text: '180 g lean grass-fed mince (raw, ~5% fat)' },
-      { text: '150 g cooked drained broccoli' },
-      { text: '30 g rocket (wilt)' },
-      { text: '50 g red onion' },
-      { text: '20 g cheddar' },
-      { text: '10 g extra virgin olive oil' },
-      { text: 'Garlic, herbs', optional: true }
     ]
   },
-  extras: { name: 'Daily extras', kcal: 160, p: 3, c: 33, f: 1, items: [
+  /* Bowl totals from the locked board, mince included, without the new ½ avocado. */
+  carbs: {
+    rice: { name: 'Rice', portion: '300 g cooked white rice', base: { kcal: 930, p: 61, c: 109, f: 25 } },
+    sweet: { name: 'Sweet potato', portion: '350 g cooked orange sweet potato', base: { kcal: 735, p: 58, c: 61, f: 25 } }
+  },
+  avocadoHalf: { kcal: 95, p: 1, c: 5, f: 9 },
+  /* Deltas vs 180 g raw lean beef mince (~5% fat: about 245 kcal, 39 g protein, 9 g fat).
+     Per 100 g × 1.8, rounded to about 5 kcal and 1 g:
+     chicken thigh, skinless — 144 kcal, 19 g protein, 8 g fat
+     wild sockeye-style salmon — 170 kcal, 22 g protein, 8.5 g fat (farmed is fattier)
+     venison — 120 kcal, 23 g protein, 2.4 g fat
+     bison, ground — 146 kcal, 20 g protein, 7 g fat
+     trimmed steak — 150 kcal, 22 g protein, 6 g fat */
+  proteins: {
+    mince: { name: 'Lean beef mince', short: 'Mince', portion: '180 g lean grass-fed mince (raw, about 5% fat)', delta: { kcal: 0, p: 0, c: 0, f: 0 } },
+    thigh: { name: 'Chicken thigh', short: 'Chicken thigh', portion: '180 g skinless chicken thigh (raw)', delta: { kcal: 10, p: -5, c: 0, f: 5 } },
+    salmon: { name: 'Salmon', short: 'Salmon', portion: '180 g wild-caught salmon (raw)', delta: { kcal: 60, p: 1, c: 0, f: 6 } },
+    venison: { name: 'Venison', short: 'Venison', portion: '180 g venison (raw)', delta: { kcal: -30, p: 2, c: 0, f: -5 } },
+    bison: { name: 'Bison', short: 'Bison', portion: '180 g bison (raw)', delta: { kcal: 15, p: -3, c: 0, f: 4 } },
+    steak: { name: 'Grass-fed steak', short: 'Steak', portion: '180 g grass-fed grass-finished steak (raw, trimmed)', delta: { kcal: 25, p: 1, c: 0, f: 2 } }
+  },
+  sides: [
+    { text: '150 g cooked drained broccoli' },
+    { text: '30 g rocket (wilt)' },
+    { text: '50 g red onion' },
+    { text: '20 g cheddar' },
+    { text: '10 g extra virgin olive oil' },
+    { text: 'Garlic, herbs', optional: true }
+  ],
+  extras: { name: 'Daily extras', macros: { kcal: 160, p: 3, c: 33, f: 1 }, items: [
     { text: '100 g raw carrot' },
     { text: '100 g fruit in season (gold kiwi used in the numbers)' },
     { text: '150 mL orange juice' }
   ]},
-  totals: {
-    rice: { kcal: 2660, p: 178, c: 253, f: 96 },
-    sweet: { kcal: 2465, p: 175, c: 205, f: 97 }
-  },
-  optionalRice: 'Optional: add 150 g cooked rice on a sweet-potato day for about 2,700 kcal and 180 g protein.',
   rules: [
-    'Same three meals every day. Rice vs sweet potato is the day switch.',
-    'No sardines. Salmon is a stretch swap only when it is affordable and wild-caught. Use an omega-3 supplement for long-chain fats when you skip it.',
+    'Same three meals every day. Change the sweetener, the carb, and the third meal in the list. The totals follow the picks.',
+    'No sardines. Salmon is an optional bowl swap when you want it (wild-caught). It is not a twice-weekly quota. An omega-3 supplement covers long-chain fats when salmon is not on the plate.',
     'No seed oils, vegetable oils, artificials, or undisclosed labels.',
     'Prefer certified organic berries and grass-finished beef where practical.',
-    'Food first for vitamin E and magnesium. Magnesium glycinate at night only if rice days stay short.',
+    'Food first for vitamin E and magnesium. Magnesium glycinate at night only if the plate stays short of about 400 mg. That is the rice plate, not sweet potato.',
     'Not lectin-free, pesticide-free, or toxin-free. Minimise exposure; don\u2019t chase purity.'
   ],
   micros: {
     covered: ['A', 'B2', 'B3', 'B5', 'B9', 'B12', 'C', 'Calcium', 'Iron', 'Manganese', 'Phosphorus', 'Potassium', 'Selenium', 'Zinc', 'Copper (partial)'],
-    // Full comparison from the handover table. Do not fill blanks.
+    /* Handover mince plate, before the extra bowl avocado. Already rounded. */
+    base: {
+      rice: { e: [10, 11], mg: 335, fibre: 28, iron: 12, zinc: 14, b12: 12, a: 2500, k: 4300, folate: 830, iodine: 275 },
+      sweet: { e: [10, 11], mg: 393, fibre: 37, iron: 13, zinc: 14, b12: 12, a: 4900, k: 5300, folate: 960, iodine: 270 }
+    },
+    /* ~60 g Hass-style avocado. Coarse on purpose. */
+    avocado: { e: 1, mg: 15, fibre: 4, k: 300, folate: 50 },
+    protein: {
+      mince: { iron: 0, zinc: 0, b12: 0 },
+      thigh: { iron: -3, zinc: -6, b12: -3 },
+      salmon: { iron: -3, zinc: -8, b12: 4 },
+      venison: { iron: 2, zinc: 0, b12: 0 },
+      bison: { iron: 0, zinc: 0, b12: 0 },
+      steak: { iron: 0, zinc: 0, b12: 0 }
+    },
     rows: [
       ['Vitamin A', '900 µg', '2,510 µg', '4,940 µg', 'Likely covered'],
       ['B1', '0.8 mg', '0.84 mg', '0.92 mg', 'Before bread B1'],
@@ -281,17 +317,37 @@ const FOOD = {
       ['Zinc', '11 mg', '14.1 mg', '14.5 mg', 'Likely covered']
     ],
     footnotes: [
-      'Vitamin A figures are Australian retinol equivalents, including plant carotenoids. Not the same as preformed retinol.',
-      'Vitamin E is a range: alpha-tocopherol and total activity are counted differently. About 4–5 mg short of 15 mg on both days.',
-      'Magnesium is about 65 mg short on rice days (335 mg) and about 7 mg short on sweet-potato days (393 mg), before unreported whey minerals.',
-      'Vitamin D, B6 and K2 are unresolved. Unresolved is not zero. K2\u2019s 200 µg is a guide comparison, not an established separate requirement.',
+      'This table is the handover mince plate only, rice column vs sweet-potato column, before the extra ½ avocado. It does not follow every swap. Use the summary above for this plate.',
+      'Vitamin A figures are Australian retinol equivalents, including plant carotenoids. Not the same as preformed retinol. Sweet potato is the big jump. Protein swaps barely move it.',
+      'Vitamin E on the handover was a range (alpha-tocopherol vs total activity), about 4–5 mg short of 15 mg. The extra ½ avocado adds about 1 mg. Still short.',
+      'Handover magnesium was about 335 mg on rice and 393 mg on sweet potato, before unreported whey minerals. The extra avocado adds about 15 mg.',
+      'Vitamin D, B6 and K2 are unresolved on beef plates. Unresolved is not zero. K2\u2019s 200 µg is a guide comparison, not an established separate requirement. Salmon is the swap that actually supplies vitamin D.',
       'B1 leaves out bread thiamin until the brand is confirmed. Copper totals are partial. K1 is likely covered and was not quantified.',
-      'Iodine about 275 µg on rice days and 270 µg on sweet-potato days (dairy-dependent). Fibre about 28 g rice / 37 g sweet potato.',
-      'Omega-3: no sardines. Salmon is a stretch swap only when it is affordable and wild-caught. An omega-3 supplement covers long-chain fats when you skip salmon.',
+      'Iodine about 275 µg with rice and 270 µg with sweet potato, almost all from the dairy. These swaps do not move it. Handover fibre was about 28 g rice / 37 g sweet potato, before the extra avocado.',
+      'Omega-3: no sardines. Only the salmon swap puts a large long-chain dose on the plate. An omega-3 supplement covers the other plates.',
       'Working estimates against the Sillz guide, not a lab export. Missing values are not zero.'
     ]
   }
 };
+
+function foodAdd(a, b) {
+  return { kcal: a.kcal + b.kcal, p: a.p + b.p, c: a.c + b.c, f: a.f + b.f };
+}
+/* picks: { sweetener: maple|honey, meal3: bowl|steak, protein: mince|thigh|salmon|venison|bison, carb: rice|sweet } */
+function foodPlate(picks) {
+  const p = picks || {};
+  const sweetener = p.sweetener === 'honey' ? 'honey' : 'maple';
+  const meal3 = p.meal3 === 'steak' ? 'steak' : 'bowl';
+  const protein = FOOD.proteins[p.protein] && p.protein !== 'steak' ? p.protein : 'mince';
+  const carb = p.carb === 'sweet' ? 'sweet' : 'rice';
+  const proteinId = meal3 === 'steak' ? 'steak' : protein;
+  const yoghurt = FOOD.sweeteners[sweetener].macros;
+  const egg = FOOD.egg.macros;
+  const third = foodAdd(foodAdd(FOOD.carbs[carb].base, FOOD.avocadoHalf), FOOD.proteins[proteinId].delta);
+  const extras = FOOD.extras.macros;
+  const day = [yoghurt, egg, third, extras].reduce(foodAdd);
+  return { sweetener, meal3, protein, carb, proteinId, yoghurt, egg, third, extras, day };
+}
 
 /* Weekly shopping checklist. ids are stable for localStorage. */
 const SHOP = [
@@ -301,15 +357,15 @@ const SHOP = [
     ['eggs', 'Pasture-raised eggs — 28 (2+ dozen)'],
     ['cottage', 'Full-fat cottage cheese — 700 g'],
     ['milk', 'Full-fat milk — 1.75 L (pasteurised organic / A2; goat or kefir = recalculate)'],
-    ['mince', 'Lean grass-fed grass-finished beef mince — 1.26 kg raw (steak day ok as swap)'],
+    ['mince', 'Lean grass-fed grass-finished beef mince — 1.26 kg raw (default bowl, 180 g × 7). Buy less if you swap proteins.'],
     ['cheddar', 'Cheddar — 140 g (Parmesan / gorgonzola ok)']
   ]},
   { title: 'Carbs and produce', items: [
-    ['bread', 'Organic sourdough — 875 g (~7 × 125 g)'],
-    ['rice', 'Organic white rice — enough for rice days (~100 g dry each)'],
-    ['sweet', 'Orange sweet potato — enough for sweet-potato days (~350 g cooked each + peel)'],
+    ['bread', 'Organic sourdough — 14 slices (2 a day, about 55–62 g each)'],
+    ['rice', 'Organic white rice — default carb, about 700 g dry (~100 g dry → 300 g cooked a day)'],
+    ['sweet', 'Orange sweet potato — carb swap for the rice (350 g cooked a day, plus peel). Not on top of a full rice week.'],
     ['berries', 'Organic berries — 1.4 kg total (strawberries / blueberries / raspberries mix)'],
-    ['avocado', 'Avocados — ~420 g flesh (~4–5 fruit)'],
+    ['avocado', 'Avocados — 14 halves (½ with the eggs and ½ with the bowl or steak). Flesh is about 50–70 g a half.'],
     ['broccoli', 'Broccoli — ~1.05 kg cooked drained (+ trim)'],
     ['rocket', 'Rocket — 210 g'],
     ['onion', 'Red onion — 350 g'],
@@ -319,15 +375,18 @@ const SHOP = [
   ]},
   { title: 'Fats, sweeteners, extras', items: [
     ['evoo', 'Extra virgin olive oil — 70 g (~5 Tbsp) for the model; extra cooking fat must be counted'],
-    ['maple', 'Pure Canadian maple syrup — 105 g (or raw honey — recalculate)'],
-    ['herbs', 'Optional: Ceylon cinnamon, garlic, rosemary, thyme, bee pollen'],
+    ['maple', 'Pure maple syrup — 105 g (or the same weight of honey)'],
+    ['herbs', 'Optional, not in the numbers: Ceylon cinnamon, bee pollen, garlic, rosemary, thyme'],
     ['ferment', 'Optional ferment: sauerkraut / kimchi / pickles (salt; not a veg swap)'],
     ['salt', 'Salt with batch metal testing if you can find it']
   ]},
-  { title: 'Stretch / rotation', note: 'Not the daily base.', items: [
-    ['salmon', 'Wild-caught salmon — only when affordable (stretch swap for mince)'],
-    ['omega', 'Omega-3 supplement — long-chain fats on weeks you skip salmon'],
-    ['proteins', 'Optional protein: cod, venison, bison, chicken thighs'],
+  { title: 'Stretch / swaps', note: 'Not the daily base. These replace the mince (steak replaces the whole bowl). They are not extras on top.', items: [
+    ['salmon', 'Wild-caught salmon — optional bowl swap, 180 g raw. Not a twice-weekly quota. No sardines.'],
+    ['thigh', 'Chicken thigh — optional bowl swap, 180 g raw, skinless'],
+    ['venison', 'Venison — optional bowl swap, 180 g raw'],
+    ['bison', 'Bison — optional bowl swap, 180 g raw'],
+    ['steak', 'Grass-fed grass-finished steak — 180 g raw, trimmed. Same sides as the bowl, served as a plate.'],
+    ['omega', 'Omega-3 supplement — long-chain fats on plates with no salmon'],
     ['pom', 'Organic pomegranates / pomegranate juice / tart-cherry juice'],
     ['ghee', 'Ghee or beef tallow for cooking (count the fat)'],
     ['drinks', 'Bone broth, coffee / green tea / yerba mate as tolerated']
