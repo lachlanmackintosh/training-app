@@ -198,6 +198,142 @@ const EFFORT = [
 
 const NUTRITION = { kcal: 2500, protein: 175, carbs: 220, fat: 100 };
 
+/* Locked meals, 6 Oct 2026. Portions and macros from the meal plan.
+   Micronutrient figures are estimates vs the Sillz guide (handover table), not lab results.
+   Meal lines are rounded on their own, so they may not add exactly to the day totals. */
+const FOOD = {
+  locked: '6 Oct 2026',
+  board: 'Locked macro board is still about 2,500 kcal until body measurements are set.',
+  meals: [
+    { name: 'Yoghurt bowl', kcal: 640, p: 52, c: 41, f: 29, items: [
+      { text: '300 g Jalna organic full-fat Greek-style yoghurt' },
+      { text: '50 g Chief unflavoured whey' },
+      { text: '200 g organic berries (100 g strawberries, 50 g blueberries, 50 g raspberries)' },
+      { text: '15 g maple syrup' },
+      { text: 'Ceylon cinnamon, bee pollen', optional: true }
+    ]},
+    { name: 'Egg meal', kcal: 930, p: 62, c: 71, f: 42, items: [
+      { text: '4 eggs (~200 g edible before cooking)' },
+      { text: '100 g full-fat cottage cheese' },
+      { text: '125 g organic sourdough (before toasting)' },
+      { text: '60 g avocado flesh' },
+      { text: '250 mL full-fat pasteurised / A2 cow milk' }
+    ]}
+  ],
+  bowl: {
+    name: 'Protein bowl',
+    note: 'Stretch swap only: wild-caught salmon when it is affordable. Recalculate that day. No sardines. An omega-3 supplement covers long-chain fats when you skip salmon.',
+    rice: { kcal: 930, p: 61, c: 109, f: 25, carb: '300 g cooked white rice' },
+    sweet: { kcal: 735, p: 58, c: 61, f: 25, carb: '350 g cooked orange sweet potato' },
+    items: [
+      { text: '180 g lean grass-fed mince (raw, ~5% fat)' },
+      { text: '150 g cooked drained broccoli' },
+      { text: '30 g rocket (wilt)' },
+      { text: '50 g red onion' },
+      { text: '20 g cheddar' },
+      { text: '10 g extra virgin olive oil' },
+      { text: 'Garlic, herbs', optional: true }
+    ]
+  },
+  extras: { name: 'Daily extras', kcal: 160, p: 3, c: 33, f: 1, items: [
+    { text: '100 g raw carrot' },
+    { text: '100 g fruit in season (gold kiwi used in the numbers)' },
+    { text: '150 mL orange juice' }
+  ]},
+  totals: {
+    rice: { kcal: 2660, p: 178, c: 253, f: 96 },
+    sweet: { kcal: 2465, p: 175, c: 205, f: 97 }
+  },
+  optionalRice: 'Optional: add 150 g cooked rice on a sweet-potato day for about 2,700 kcal and 180 g protein.',
+  rules: [
+    'Same three meals every day. Rice vs sweet potato is the day switch.',
+    'No sardines. Salmon is a stretch swap only when it is affordable and wild-caught. Use an omega-3 supplement for long-chain fats when you skip it.',
+    'No seed oils, vegetable oils, artificials, or undisclosed labels.',
+    'Prefer certified organic berries and grass-finished beef where practical.',
+    'Food first for vitamin E and magnesium. Magnesium glycinate at night only if rice days stay short.',
+    'Not lectin-free, pesticide-free, or toxin-free. Minimise exposure; don\u2019t chase purity.'
+  ],
+  micros: {
+    covered: ['A', 'B2', 'B3', 'B5', 'B9', 'B12', 'C', 'Calcium', 'Iron', 'Manganese', 'Phosphorus', 'Potassium', 'Selenium', 'Zinc', 'Copper (partial)'],
+    // Full comparison from the handover table. Do not fill blanks.
+    rows: [
+      ['Vitamin A', '900 µg', '2,510 µg', '4,940 µg', 'Likely covered'],
+      ['B1', '0.8 mg', '0.84 mg', '0.92 mg', 'Before bread B1'],
+      ['B2', '1.3 mg', '3.0 mg', '3.2 mg', 'Likely covered'],
+      ['B3', '16 mg', '40 mg NE', '42 mg NE', 'Likely covered'],
+      ['B5', '5 mg', '6.7 mg', '8.1 mg', 'Likely covered'],
+      ['B6', '1.3 mg', 'Unresolved', 'Unresolved', 'Verify full B6'],
+      ['B9 folate', '400 µg', '825 µg', '955 µg', 'Natural folate'],
+      ['B12', '2.4 µg', '11.5 µg', '11.5 µg', 'Likely covered'],
+      ['Vitamin C', '90 mg', '370 mg', '420 mg', 'Likely covered'],
+      ['Vitamin D', '15 µg', 'Unresolved', 'Unresolved', 'Assess separately'],
+      ['Vitamin E', '15 mg', '10–11 mg', '10–11 mg', 'Gap 4–5 mg'],
+      ['Vitamin K1', '120 µg', 'Likely covered', 'Likely covered', 'Not quantified'],
+      ['Vitamin K2', '200 µg', 'Unresolved', 'Unresolved', 'Not an established RDI'],
+      ['Calcium', '1,000 mg', '1,215 mg', '1,325 mg', 'Likely covered'],
+      ['Copper', '0.9 mg', 'At least 1.2 mg', 'At least 1.4 mg', 'Partial totals'],
+      ['Iron', '8 mg', '11.8 mg', '13.3 mg', 'Likely covered'],
+      ['Magnesium', '400 mg', '335 mg', '393 mg', 'Gap 65 / 7 mg'],
+      ['Manganese', '2.3 mg', '3.6 mg', '4.4 mg', 'Likely covered'],
+      ['Phosphorus', '700 mg', '2,070 mg', '2,085 mg', 'Likely covered'],
+      ['Potassium', '3,400 mg', '4,280 mg', '5,250 mg', 'Likely covered'],
+      ['Selenium', '55 µg', '119 µg', '114 µg', 'Likely covered'],
+      ['Zinc', '11 mg', '14.1 mg', '14.5 mg', 'Likely covered']
+    ],
+    footnotes: [
+      'Vitamin A figures are Australian retinol equivalents, including plant carotenoids. Not the same as preformed retinol.',
+      'Vitamin E is a range: alpha-tocopherol and total activity are counted differently. About 4–5 mg short of 15 mg on both days.',
+      'Magnesium is about 65 mg short on rice days (335 mg) and about 7 mg short on sweet-potato days (393 mg), before unreported whey minerals.',
+      'Vitamin D, B6 and K2 are unresolved. Unresolved is not zero. K2\u2019s 200 µg is a guide comparison, not an established separate requirement.',
+      'B1 leaves out bread thiamin until the brand is confirmed. Copper totals are partial. K1 is likely covered and was not quantified.',
+      'Iodine about 275 µg on rice days and 270 µg on sweet-potato days (dairy-dependent). Fibre about 28 g rice / 37 g sweet potato.',
+      'Omega-3: no sardines. Salmon is a stretch swap only when it is affordable and wild-caught. An omega-3 supplement covers long-chain fats when you skip salmon.',
+      'Working estimates against the Sillz guide, not a lab export. Missing values are not zero.'
+    ]
+  }
+};
+
+/* Weekly shopping checklist. ids are stable for localStorage. */
+const SHOP = [
+  { title: 'Dairy and protein', items: [
+    ['yoghurt', 'Jalna organic Farm to Pot Greek yoghurt — 2.1 kg (or other full-fat Greek / Skyr; recalculate whey)'],
+    ['whey', 'Chief unflavoured whey — 350 g'],
+    ['eggs', 'Pasture-raised eggs — 28 (2+ dozen)'],
+    ['cottage', 'Full-fat cottage cheese — 700 g'],
+    ['milk', 'Full-fat milk — 1.75 L (pasteurised organic / A2; goat or kefir = recalculate)'],
+    ['mince', 'Lean grass-fed grass-finished beef mince — 1.26 kg raw (steak day ok as swap)'],
+    ['cheddar', 'Cheddar — 140 g (Parmesan / gorgonzola ok)']
+  ]},
+  { title: 'Carbs and produce', items: [
+    ['bread', 'Organic sourdough — 875 g (~7 × 125 g)'],
+    ['rice', 'Organic white rice — enough for rice days (~100 g dry each)'],
+    ['sweet', 'Orange sweet potato — enough for sweet-potato days (~350 g cooked each + peel)'],
+    ['berries', 'Organic berries — 1.4 kg total (strawberries / blueberries / raspberries mix)'],
+    ['avocado', 'Avocados — ~420 g flesh (~4–5 fruit)'],
+    ['broccoli', 'Broccoli — ~1.05 kg cooked drained (+ trim)'],
+    ['rocket', 'Rocket — 210 g'],
+    ['onion', 'Red onion — 350 g'],
+    ['carrot', 'Carrots — 700 g'],
+    ['fruit', 'Seasonal fruit — 700 g'],
+    ['juice', 'Organic orange juice — 1.05 L (only 150 mL/day counted)']
+  ]},
+  { title: 'Fats, sweeteners, extras', items: [
+    ['evoo', 'Extra virgin olive oil — 70 g (~5 Tbsp) for the model; extra cooking fat must be counted'],
+    ['maple', 'Pure Canadian maple syrup — 105 g (or raw honey — recalculate)'],
+    ['herbs', 'Optional: Ceylon cinnamon, garlic, rosemary, thyme, bee pollen'],
+    ['ferment', 'Optional ferment: sauerkraut / kimchi / pickles (salt; not a veg swap)'],
+    ['salt', 'Salt with batch metal testing if you can find it']
+  ]},
+  { title: 'Stretch / rotation', note: 'Not the daily base.', items: [
+    ['salmon', 'Wild-caught salmon — only when affordable (stretch swap for mince)'],
+    ['omega', 'Omega-3 supplement — long-chain fats on weeks you skip salmon'],
+    ['proteins', 'Optional protein: cod, venison, bison, chicken thighs'],
+    ['pom', 'Organic pomegranates / pomegranate juice / tart-cherry juice'],
+    ['ghee', 'Ghee or beef tallow for cooking (count the fat)'],
+    ['drinks', 'Bone broth, coffee / green tea / yerba mate as tolerated']
+  ]}
+];
+
 const GROUP_LABEL = { explosive: 'Explosive: fast and fresh', main: 'Main lifts', muscle: 'Muscle work', finisher: 'Finisher: neck and grip' };
 
 /* Demo videos (YouTube, embedded via youtube-nocookie on tap). Every ID was checked on 1 Oct 2026:

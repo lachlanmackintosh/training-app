@@ -189,5 +189,36 @@ details.card summary{cursor:pointer;min-height:36px;line-height:36px}
 .demo img.thumb{object-fit:cover}
 .demo .nolink small{display:block;margin-top:4px;font-size:12px}
 .mobcard{border-color:#1f6b52}
-.tabs a{font-size:11px}
-.tabs a .ti{font-size:21px}
+.tabs a{font-size:10px;letter-spacing:-0.01em;padding:0 1px}
+.tabs a .ti{font-size:18px}
+@media (min-width:360px){
+  .tabs a{font-size:11px}
+  .tabs a .ti{font-size:20px}
+}
+
+/* food */
+.foodcard{border-color:#3d5a28}
+.seg.foodseg{margin-top:12px}
+.macros{display:flex;flex-wrap:wrap;gap:4px 12px;align-items:baseline;margin-top:6px}
+.macros b{color:var(--accent2);font-size:18px}
+.macros span{color:var(--muted);font-size:14px}
+.portions{list-style:none;margin:12px 0 0;padding:0}
+.portions li{padding:8px 0 8px 14px;border-top:1px solid var(--line);font-size:15px;position:relative}
+.portions li:before{content:'';position:absolute;left:0;top:16px;width:6px;height:6px;border-radius:50%;background:var(--accent2)}
+.portions li.opt{color:var(--muted);font-size:14px}
+.portions li.opt:before{background:var(--line)}
+.portions li.carb{font-weight:700}
+.dayrow{border-radius:12px;padding:10px;margin-top:10px;border:1px solid transparent}
+.dayrow.on{background:#1c2414;border-color:#3d5a28}
+.dayrow .stat b{font-size:15px;letter-spacing:-0.03em}
+.check{display:flex;align-items:flex-start;gap:12px;padding:12px 0;border-bottom:1px solid var(--line);min-height:48px;cursor:pointer}
+.check:last-child{border-bottom:0}
+.check input{width:28px;height:28px;margin:0;flex:none;accent-color:var(--good)}
+.check span{padding-top:3px}
+.check.on span{color:var(--muted);text-decoration:line-through}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.micron{padding:10px 0;border-top:1px solid var(--line)}
+.micron:first-child{border-top:0}
+.micro-more{margin-top:8px}
+.micro-more summary{cursor:pointer;min-height:44px;display:flex;align-items:center;color:var(--blue);font-weight:700}
+.gap{color:var(--accent2);font-weight:700}
