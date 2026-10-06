@@ -21,9 +21,14 @@ function foodState() {
     protein: proteinOk[from.protein] ? from.protein : 'mince',
     carb: (from.carb || src.carb) === 'sweet' ? 'sweet' : 'rice'
   };
-  return { picks, checks: checksSrc };
+  const snacks = src.snacks && typeof src.snacks === 'object' && !Array.isArray(src.snacks) ? src.snacks : null;
+  return { picks, snacks, checks: checksSrc };
 }
-function saveFood(st) { save(LS.food, { picks: st.picks, checks: st.checks }); }
+function saveFood(st) {
+  const payload = { picks: st.picks, checks: st.checks };
+  if (st.snacks) payload.snacks = st.snacks;
+  save(LS.food, payload);
+}
 
 let settings = Object.assign({}, DEFAULT_SETTINGS, load(LS.settings, {}));
 let log = load(LS.log, []);
@@ -225,7 +230,7 @@ function renderHome() {
   }
   const mk = mobKeyFor(d), mo = MOBILITY[mk];
   const n = NUTRITION;
-  const food = foodState(), plate = foodPlate(food.picks), ft = plate.day;
+  const food = foodState(), plate = foodPlate(food.picks, food.snacks), ft = plate.day;
   const thirdName = plate.meal3 === 'steak' ? 'Steak plate' : 'Protein bowl';
   const swapLine = [
     FOOD.sweeteners[plate.sweetener].name,
@@ -244,7 +249,8 @@ function renderHome() {
     <a class="btn ghost" style="margin-top:10px" href="#/mobility/${mk}">Start mobility</a></div>
   <div class="card foodcard"><div class="row between wrap"><b>Today's meals</b><span class="muted small">${esc(swapLine)}</span></div>
     <div style="margin-top:4px;font-weight:700;font-size:17px">Yoghurt bowl · Egg meal · ${esc(thirdName)}</div>
-    <div class="muted small">~${comma(ft.kcal)} kcal · ${ft.p} g protein · ${ft.c} g carbs · ${ft.f} g fat with these swaps. The target board below is still 2,500 kcal.</div>
+    <div class="muted small">~${comma(ft.kcal)} kcal · ${ft.p} g protein · ${ft.c} g carbs · ${ft.f} g fat with these swaps and snacks. The target board below is still 2,500 kcal.</div>
+    ${plate.snack.custom ? `<div class="muted small">Snacks: ${esc(plate.snack.picked.length ? plate.snack.picked.map(x => x.short).join(' · ') : 'none')}</div>` : ''}
     <a class="btn ghost" style="margin-top:10px" href="#/food">Open meals</a>
     <a class="small" style="display:inline-block;margin-top:8px;min-height:36px;line-height:36px" href="#/food/shop">Shopping list</a></div>
   <div class="card"><div class="row between"><b>Nutrition: daily targets</b><span class="muted small">every day</span></div>
@@ -623,24 +629,25 @@ function renderShop() {
     return `<div class="group-h">${esc(g.title)}</div><div class="card" style="margin-top:4px">${g.note ? `<div class="muted small">${esc(g.note)}</div>` : ''}${items}</div>`;
   }).join('');
   return `<div class="row between" style="margin-top:14px"><div><b id="shop-count">${done} of ${total} ticked</b>
-      <div class="muted small">Buy the calculated base first. Alternatives are swaps, not extras.</div></div></div>
+      <div class="muted small">Buy the calculated base first. Snacks and swaps are listed on their own and are not extra food unless you buy them.</div></div></div>
     <button class="btn ghost" style="margin-top:10px" data-act="shop-reset">Reset for new week</button>
     ${groups}`;
 }
 function near(n, step) { return Math.round(n / step) * step; }
 function microNow(plate) {
   const b = FOOD.micros.base[plate.carb], a = FOOD.micros.avocado, d = FOOD.micros.protein[plate.proteinId];
+  const s = plate.snack.micro;
   return {
-    e0: b.e[0] + a.e, e1: b.e[1] + a.e,
-    mg: near(b.mg + a.mg, 10),
-    fibre: b.fibre + a.fibre,
-    iron: b.iron + d.iron,
-    zinc: b.zinc + d.zinc,
-    b12: b.b12 + d.b12,
-    a: b.a,
-    k: near(b.k + a.k, 100),
-    folate: near(b.folate + a.folate, 50),
-    iodine: b.iodine
+    e0: b.e[0] + a.e + s.e, e1: b.e[1] + a.e + s.e,
+    mg: near(b.mg + a.mg + s.mg, 10),
+    fibre: b.fibre + a.fibre + s.fibre,
+    iron: b.iron + d.iron + s.iron,
+    zinc: b.zinc + d.zinc + s.zinc,
+    b12: b.b12 + d.b12 + s.b12,
+    a: b.a + s.a,
+    k: near(b.k + a.k + s.k, 100),
+    folate: near(b.folate + a.folate + s.folate, 50),
+    iodine: b.iodine + s.iodine
   };
 }
 function microHtml(plate) {
@@ -654,25 +661,70 @@ function microHtml(plate) {
   const mgLine = mgShort > 10
     ? `about ${comma(now.mg)} mg. Guide 400 mg, so still short by about ${comma(mgShort)} mg.`
     : `about ${comma(now.mg)} mg, which meets the 400 mg guide.`;
+  const eRange = now.e0 === now.e1 ? String(now.e0) : `${now.e0}–${now.e1}`;
+  const caf = plate.snack.picked.filter(p => p.tag === 'caffeine');
+  const extraBits = [
+    plate.snack.tags.k2 ? 'Extra cheese is on. It adds some K2, which still is not a number here.' : '',
+    plate.snack.tags.salt ? 'A ferment is on. Count it as salt, roughly a few hundred milligrams of sodium in 50 g, not as a second serving of vegetables.' : '',
+    plate.snack.tags.broth ? 'Bone broth is on. Its sodium and minerals are not in these figures.' : '',
+    !plate.snack.sel.fruit && !plate.snack.sel.oj ? 'Fruit and orange juice are both off, so vitamin C is lower than the handover day. It is not given a new total.' : ''
+  ].filter(Boolean);
   return `<div class="card"><b>Micronutrients</b>
-    <div class="muted small" style="margin-top:4px">For this plate. Estimates against the Sillz guide, not lab results. Figures are rounded so a swap does not look more precise than it is.</div>
+    <div class="muted small" style="margin-top:4px">For this plate, including the snacks that are on. Estimates against the Sillz guide, not lab results. Figures are rounded so a pick does not look more precise than it is. A default day still has the carrot, gold kiwi and 150 mL juice inside these figures.</div>
     <div class="chips">${m.covered.map(c => `<span class="chip">${esc(c)}</span>`).join('')}</div>
     <ul class="bul small">
-      <li><b class="gap">Vitamin E</b> — about ${now.e0}–${now.e1} mg, still a few milligrams short of the 15 mg guide. The extra ½ avocado is already in that range.</li>
+      <li><b class="${now.e0 < 15 ? 'gap' : ''}">Vitamin E</b> — about ${eRange} mg, ${now.e0 < 15 ? 'still short of the 15 mg guide' : 'which meets the 15 mg guide on this estimate'}. The extra ½ avocado is in that range.${plate.snack.tags.pollen ? ' Bee pollen is not included.' : ''}</li>
       <li><b class="${mgShort > 10 ? 'gap' : ''}">Magnesium</b> — ${mgLine} Whey minerals that are not on the label are not included.</li>
       <li><b>Iron</b> — about ${now.iron} mg. <b>Zinc</b> — about ${now.zinc} mg. <b>B12</b> — about ${now.b12} µg. ${salmon ? 'Salmon is lower in iron and zinc than mince, and a bit higher in B12.' : plate.proteinId === 'thigh' ? 'Chicken thigh is lower in iron, zinc and B12 than mince.' : plate.proteinId === 'venison' ? 'Venison is a bit higher in iron than mince. Zinc and B12 stay close.' : 'Close to the mince plate for these three.'}</li>
       <li><b>Vitamin D</b> — ${salmon ? 'the salmon portion alone is on the order of 15–25 µg (wild sockeye-style). That is not a full-day assay. The rest of the plate was unresolved.' : 'still unresolved on this plate. Unresolved is not zero.'}</li>
       <li><b>Omega-3</b> — ${salmon ? 'this plate has salmon, on the order of 1.5–2.5 g long-chain omega-3 from that portion. No sardines.' : 'no salmon on this plate, and no sardines. Use the omega-3 supplement.'}</li>
       <li><b>Vitamin A</b> — about ${comma(now.a)} µg retinol equivalents. Sweet potato is the jump, not the protein. <b>Fibre</b> — about ${now.fibre} g. <b>Potassium</b> — about ${comma(now.k)} mg. <b>Folate</b> — about ${comma(now.folate)} µg.</li>
     </ul>
-    <div class="muted small">Iodine stays about ${now.iodine} µg and comes mostly from the dairy. B6 and K2 stay unresolved. A blank is not zero intake.</div>
+    <div class="muted small">Iodine is about ${now.iodine} µg and comes mostly from the dairy${plate.snack.tags && (plate.snack.sel.kefir || plate.snack.sel.xmilk) ? ', including the extra dairy on this day. Still a generic dairy estimate' : ''}. B6 and K2 stay unresolved. A blank is not zero intake.</div>
+    ${caf.length ? `<div class="muted small" style="margin-top:6px"><b>Caffeine</b> — ${caf.map(p => `${esc(p.short)} about ${esc(p.caffeine)}`).join('; ')}. A note, not a target.</div>` : ''}
+    ${extraBits.length ? `<ul class="bul small">${extraBits.map(t => `<li>${esc(t)}</li>`).join('')}</ul>` : ''}
     <details class="micro-more"><summary>Handover table (mince, before the extra avocado)</summary>
       ${rows}
       <ul class="bul small">${m.footnotes.map(f => `<li>${esc(f)}</li>`).join('')}</ul>
     </details></div>`;
 }
-function renderMeals(picks) {
-  const plate = foodPlate(picks);
+function macroBit(m) {
+  return `~${comma(m.kcal)} kcal · ${m.p} g protein · ${m.c} g carbs · ${m.f} g fat`;
+}
+function snackItemHtml(it, portionId) {
+  const on = !!portionId;
+  const ids = Object.keys(it.portions);
+  if (it.choose) {
+    const rows = ids.map(id => {
+      const p = it.portions[id], isOn = id === portionId;
+      return `<button type="button" class="pickrow${isOn ? ' on' : ''}" data-act="snack-portion" data-id="${esc(it.id)}" data-v="${esc(id)}" data-off="1" aria-pressed="${isOn ? 'true' : 'false'}"><span>${esc(p.name)}</span><span class="muted small">${esc(p.label)} · ${macroBit(p.macros)}</span>${p.note ? `<span class="muted small">${esc(p.note)}</span>` : ''}</button>`;
+    }).join('');
+    return `<div class="picklabel">${esc(it.name)}</div>${it.note ? `<div class="muted small">${esc(it.note)}</div>` : ''}<div class="pick" role="group" aria-label="${esc(it.name)}">${rows}</div>`;
+  }
+  const shown = it.portions[portionId] || it.portions[it.defaultPortion];
+  const sub = on ? `${shown.label} · ${macroBit(shown.macros)}` : `Off · ${shown.label} would add ${macroBit(shown.macros)}`;
+  const note = [(on && shown.note) || it.note, shown.caffeine ? `Caffeine about ${shown.caffeine}.` : ''].filter(Boolean).join(' ');
+  const toggle = `<button type="button" class="pickrow snackrow${on ? ' on' : ''}" data-act="snack-toggle" data-id="${esc(it.id)}" aria-pressed="${on ? 'true' : 'false'}"><span>${esc(it.name)}${it.occasional ? ' <span class="badge">Occasional</span>' : ''}</span><span class="muted small">${esc(sub)}</span>${note ? `<span class="muted small">${esc(note)}</span>` : ''}</button>`;
+  if (ids.length < 2) return toggle;
+  const seg = `<div class="seg foodpick snackseg" role="group" aria-label="${esc(it.name)} portion">${ids.map(id => {
+    const p = it.portions[id], isOn = id === portionId;
+    return `<button type="button" class="${isOn ? 'on' : ''}" data-act="snack-portion" data-id="${esc(it.id)}" data-v="${esc(id)}" aria-pressed="${isOn ? 'true' : 'false'}">${esc(p.chip || p.label)}</button>`;
+  }).join('')}</div>`;
+  return toggle + seg;
+}
+function renderSnacks(plate) {
+  const sel = plate.snack.sel;
+  const groups = FOOD.snackGroups.map(g => {
+    const items = FOOD.snackItems.filter(it => it.group === g.id).map(it => snackItemHtml(it, sel[it.id])).join('');
+    return `<div class="picklabel">${esc(g.title)}</div>${g.note ? `<div class="muted small">${esc(g.note)}</div>` : ''}${items}`;
+  }).join('');
+  return `<div class="card"><h3>Snacks & drinks</h3>
+    ${macroLine(plate.snack.macros)}
+    <div class="muted small" style="margin-top:4px">${esc(FOOD.snackIntro)}</div>
+    ${groups}</div>`;
+}
+function renderMeals(st) {
+  const plate = foodPlate(st.picks, st.snacks);
   const thirdName = plate.meal3 === 'steak' ? 'Steak plate' : 'Protein bowl';
   const protein = FOOD.proteins[plate.proteinId];
   const carb = FOOD.carbs[plate.carb];
@@ -701,9 +753,9 @@ function renderMeals(picks) {
       ${portionsHtml(thirdItems)}
       <div class="note">${esc(salmonNote)}</div>
     </div>
-    <div class="card"><h3>${esc(FOOD.extras.name)}</h3>${macroLine(plate.extras)}${portionsHtml(FOOD.extras.items)}</div>
+    ${renderSnacks(plate)}
     <div class="card"><b>Day total</b>
-      <div class="muted small" style="margin-top:4px">Sum of the four estimates above. Each meal is already rounded.</div>
+      <div class="muted small" style="margin-top:4px">Three meals plus the snacks that are on. Each line is already rounded. Snacks: ${plate.snack.picked.length ? esc(plate.snack.picked.map(x => x.short).join(' · ')) : 'none'}.</div>
       <div class="grid4" style="margin-top:8px">
         <div class="stat"><b>~${comma(day.kcal)}</b><span>kcal</span></div>
         <div class="stat"><b>${day.p}</b><span>g protein</span></div>
@@ -717,12 +769,12 @@ function renderMeals(picks) {
 }
 function renderFood(arg) {
   const mode = arg === 'shop' ? 'shop' : 'meals';
-  const picks = foodState().picks;
+  const st = foodState();
   view().innerHTML = `<div class="row between"><h1 style="margin:0">Food</h1><span class="muted small">Locked ${esc(FOOD.locked)}</span></div>
     <div class="muted small" style="margin-top:4px">${esc(FOOD.board)}</div>
     <div class="muted small">${esc(FOOD.estimate)}</div>
     ${foodSeg(mode)}
-    ${mode === 'shop' ? renderShop() : renderMeals(picks)}`;
+    ${mode === 'shop' ? renderShop() : renderMeals(st)}`;
 }
 function foodArg() {
   return (location.hash.replace(/^#\/?/, '').split('/')[1]) || '';
@@ -860,6 +912,20 @@ document.addEventListener('click', e => {
     const ok = { sweetener: { maple: 1, honey: 1 }, meal3: { bowl: 1, steak: 1 }, protein: { mince: 1, thigh: 1, salmon: 1, venison: 1, bison: 1 }, carb: { rice: 1, sweet: 1 } };
     if (!ok[k] || !ok[k][v] || st.picks[k] === v) return;
     st.picks[k] = v; saveFood(st);
+    const y = scrollY; renderFood(foodArg()); scrollTo(0, y);
+  } else if (act === 'snack-toggle' || act === 'snack-portion') {
+    const item = FOOD.snackById[b.dataset.id];
+    if (!item) return;
+    const st = foodState();
+    const sel = Object.assign({}, snackState(st.snacks).sel);
+    if (act === 'snack-toggle') sel[item.id] = sel[item.id] ? null : item.defaultPortion;
+    else {
+      const v = b.dataset.v;
+      if (!item.portions[v]) return;
+      sel[item.id] = sel[item.id] === v && b.dataset.off ? null : v;
+    }
+    st.snacks = snacksToStore(sel);
+    saveFood(st);
     const y = scrollY; renderFood(foodArg()); scrollTo(0, y);
   } else if (act === 'shop-reset') {
     const st = foodState();
