@@ -47,9 +47,9 @@
     <form id="ask-form" class="ask-form" autocomplete="off">
       <div id="ask-live" class="ask-live hidden" aria-live="polite">Listening…</div>
       <label class="vh" for="ask-input">What you ate, or a question</label>
-      <textarea id="ask-input" rows="2" placeholder="Type what you ate, or use the mic on the keyboard" enterkeyhint="send"></textarea>
+      <textarea id="ask-input" rows="5" placeholder="Type or dictate, then tap Send" enterkeyhint="send" autocapitalize="sentences" spellcheck="true"></textarea>
       <div class="ask-row">
-        <button type="button" id="ask-mic" class="btn" data-act="ask-mic">🎤 Speak</button>
+        <button type="button" id="ask-mic" class="btn" data-act="ask-mic" aria-pressed="false">🎤 Speak</button>
         <button type="submit" class="btn ghost" id="ask-send">Send</button>
       </div>
       <p class="ask-note">Get a free key at <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">aistudio.google.com/apikey</a>. What you type or say about food is sent to Google. The key stays on this phone.</p>
