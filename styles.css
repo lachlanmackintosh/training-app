@@ -125,7 +125,7 @@ a{color:var(--accent);text-underline-offset:2px}
 .toggle{display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:52px}
 .toggle input{width:52px;height:30px;accent-color:var(--accent);flex:none}
 .group-h{
-  font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;
+  font-size:13px;font-weight:700;letter-spacing:.01em;
   color:var(--muted);margin:26px 0 6px;
 }
 .textlink{
@@ -207,8 +207,8 @@ details.card.fold>summary{min-height:52px}
 .fld input:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
 .fld span{position:absolute;right:8px;top:5px;font-size:11px;letter-spacing:.02em;color:var(--muted);pointer-events:none}
 .tick{
-  width:52px;height:52px;border-radius:16px;border:1.5px solid rgba(242,246,248,.18);
-  background:transparent;color:transparent;font-size:26px;font-weight:800;
+  width:52px;height:52px;border-radius:16px;border:1.5px solid rgba(242,246,248,.28);
+  background:var(--field);color:transparent;font-size:26px;font-weight:800;
   display:flex;align-items:center;justify-content:center;align-self:center;cursor:pointer;
 }
 .setrow.done .tick{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
