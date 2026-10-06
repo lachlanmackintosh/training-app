@@ -259,30 +259,31 @@ function renderHome() {
     : 'Nothing ticked as eaten yet. ';
   view().innerHTML = `
   <div class="row between"><div><div class="muted small">${esc(fmtLong(d))}</div><h1 class="apph">${esc(APP_HEADING)}</h1></div>
-    <a class="iconbtn" href="#/settings" aria-label="Settings">⚙️</a></div>
+    <a class="iconbtn" href="#/settings" aria-label="Settings"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"><path d="M4 8h16M4 16h16"/><circle cx="9" cy="8" r="2.25"/><circle cx="15" cy="16" r="2.25"/></svg></a></div>
   ${askBarHtml(false)}
   <div class="card"><div class="row between wrap"><b>${esc(weekLine(bi))}</b>${phaseChip(bi)}</div>
     <div class="muted small" style="margin-top:6px">${esc(PHASES[bi.phase].short)}</div></div>
   <div class="card hero">${todayHtml}</div>
-  <div class="card mobcard"><div class="row between"><b>Today's mobility</b><span class="muted small">${mobMins(mk)} min</span></div>
-    <div style="margin-top:4px;font-weight:700;font-size:17px">${esc(mo.name)}</div>
+  <div class="card mobcard"><div class="row between"><b class="kicker">Today's mobility</b><span class="muted small">${mobMins(mk)} min</span></div>
+    <div class="cardtitle">${esc(mo.name)}</div>
     <div class="muted small">${esc(mo.moves.slice(0, 4).map(x => x[0]).join(' · '))} …</div>
     <a class="btn ghost" style="margin-top:10px" href="#/mobility/${mk}">Start mobility</a></div>
-  <div class="card foodcard"><div class="row between wrap"><b>Today's meals</b><span class="muted small">${esc(swapLine)}</span></div>
-    <div style="margin-top:4px;font-weight:700;font-size:17px">Yoghurt bowl · Egg meal · ${esc(thirdName)}</div>
+  <div class="card foodcard"><div class="row between wrap"><b class="kicker">Today's meals</b><span class="muted small">${esc(swapLine)}</span></div>
+    <div class="cardtitle">Yoghurt bowl · Egg meal · ${esc(thirdName)}</div>
     <div class="muted small">${eatenLine}Planned ~${comma(planned.kcal)} kcal · ${planned.p} g protein. Target board is still 2,500 kcal and 175 g protein.</div>
     ${plate.snack.custom ? `<div class="muted small">Snacks: ${esc(plate.snack.picked.length ? plate.snack.picked.map(x => x.short).join(' · ') : 'none')}</div>` : ''}
     <a class="btn ghost" style="margin-top:10px" href="#/food">Open meals</a>
-    <a class="small" style="display:inline-block;margin-top:8px;min-height:36px;line-height:36px" href="#/food/shop">Shopping list</a></div>
-  <div class="card"><div class="row between"><b>Nutrition: daily targets</b><span class="muted small">every day</span></div>
+    <a class="textlink" href="#/food/shop">Shopping list</a></div>
+  <div class="card"><div class="row between"><b class="kicker">Daily targets</b><span class="muted small">every day</span></div>
     <div class="grid4" style="margin-top:10px">
       <div class="stat"><b>${n.kcal}</b><span>kcal</span></div><div class="stat"><b>${n.protein}</b><span>g protein</span></div>
       <div class="stat"><b>~${n.carbs}</b><span>g carbs</span></div><div class="stat"><b>~${n.fat}</b><span>g fat</span></div></div>
     <div class="muted small" style="margin-top:10px">Sleep 8 hours. No phone during rest: breathe and drink water.</div></div>
-  <div class="card"><div class="muted small" style="margin-bottom:8px">Missed a session? Don't double up. Do the next one.</div>
+  <details class="card fold"><summary>Other sessions</summary>
+    <div class="muted small" style="margin-bottom:8px">Missed a session? Don't double up. Do the next one.</div>
     <div class="grid2">
       <a class="btn ghost small" href="#/workout/A">Session 1</a><a class="btn ghost small" href="#/workout/B">Session 2</a>
-      <a class="btn ghost small" href="#/workout/C">Session 3</a><a class="btn ghost small" href="#/hiit">HIIT</a></div></div>
+      <a class="btn ghost small" href="#/workout/C">Session 3</a><a class="btn ghost small" href="#/hiit">HIIT</a></div></details>
   ${loggedToday.length ? `<div class="muted small" style="text-align:center">${loggedToday.length} set${loggedToday.length > 1 ? 's' : ''} logged today</div>` : ''}`;
 }
 
@@ -295,10 +296,12 @@ function countDoneSets(ex, ds, phase) {
 function renderProgram() {
   const bi = blockInfo();
   const dayCard = p => `<div class="card"><div class="row between"><div><h3>${esc(p.title)}</h3><div class="subt">${esc(p.day)} · ${esc(p.focus)}</div></div></div>
+    <details class="fold"><summary>${p.exercises.length} exercises, tempo and swaps</summary>
     ${p.exercises.map(ex => { const t = target(ex, bi.phase); return `<div class="ex-mini"><div class="row between"><div><b>${esc(ex.parts.join(' + '))}</b>${ex.main ? '<span class="badge">Main</span>' : ''}${ex.superset && ex.parts.length > 1 ? '<span class="badge ss">Superset</span>' : ''}</div></div>
       <div class="small"><span class="target">${esc(targetText(target(Object.assign({}, ex, { id: '_' }), bi.phase)))}</span> · <span class="muted">${ex.rest ? 'rest ' + restText(ex.rest) : 'no rest'}</span></div>
       <div class="tline">${tempoChips(ex.parts)}</div>
       <div class="sw">Swap: ${esc(ex.swap.label)} ${tempoChips(ex.swap.parts)}</div></div>`; }).join('')}
+    </details>
     <a class="btn" style="margin-top:12px" href="#/workout/${p.key}">Open ${esc(p.title)}</a></div>`;
   view().innerHTML = `<h1>Program</h1>
   <div class="row between wrap"><span class="muted small">${esc(weekLine(bi))}</span>${phaseChip(bi)}</div>
@@ -388,8 +391,10 @@ function exerciseCard(ex, ds, phase, idx) {
     <div class="last">${lastHtml}</div>
     <div class="sets">${rows}</div>
     <button class="swap${sw ? ' on' : ''}" data-act="swap" data-ex="${ex.id}">⇄ ${sw ? `Swapped. Tap for original: ${esc(ex.parts.join(' + '))}` : `Swap: ${esc(ex.swap.label)}`}</button>
-    <div class="parts${two ? ' two' : ''}">${parts.map(demoHtml).join('')}</div>
-    ${parts.map(m => `<a class="hist-link" href="#/history/${encodeURIComponent(m)}">History: ${esc(m)}</a>`).join('')}
+    <details class="fold"><summary>Form and demo</summary>
+      <div class="parts${two ? ' two' : ''}">${parts.map(demoHtml).join('')}</div>
+      ${parts.map(m => `<a class="hist-link" href="#/history/${encodeURIComponent(m)}">History: ${esc(m)}</a>`).join('')}
+    </details>
   </section>`;
 }
 
@@ -398,7 +403,7 @@ function renderWorkout(k) {
   const d = today(), ds = ymd(d), bi = blockInfo(d), ph = PHASES[bi.phase];
   let html = `<div class="topbar"><a class="back" href="#/home" aria-label="Back">‹</a><div style="flex:1"><div class="muted small">${esc(weekLine(bi))}</div><h1 style="font-size:22px;margin:0">${esc(p.title)}</h1><div class="subt">${esc(p.day)} · ${esc(p.focus)}</div></div>${phaseChip(bi)}</div>
     <div class="note ${ph.cls}"><b>${ph.name}:</b> ${esc(ph.short)}</div>
-    <div class="note"><b>Warm-up:</b> 5 min easy bike, then 2 light sets of your first main lift.</div>
+    <details class="card fold"><summary>Warm-up</summary><div>5 min easy bike, then 2 light sets of your first main lift.</div></details>
     <label class="toggle card" style="padding:10px 16px"><span><b>Short on time?</b><br><span class="muted small">Explosive moves and the 2 main lifts only</span></span><input type="checkbox" data-act="short" ${ui.short ? 'checked' : ''}></label>`;
   let lastGroup = '';
   p.exercises.forEach((ex, i) => {
@@ -421,7 +426,7 @@ function hiitPick(d = today()) { // one recommended session each week; deload = 
 function rotationAhead(d) { const bi = blockInfo(d), w = bi.pre ? 0 : bi.totalWeek - 1; return [1, 2].map(i => HIIT_ROTATION[(w + i) % HIIT_ROTATION.length]); }
 const goalChip = g => `<span class="goal ${GOALS[g].cls}">${GOALS[g].label}</span>`;
 function effortCard() {
-  return `<div class="card"><b>How hard? (RPE out of 10)</b><table class="effort">${EFFORT.map(([n, l, d]) => `<tr><td class="rpe">${n}</td><td><b>${l}</b><div class="muted small">${esc(d)}</div></td></tr>`).join('')}</table></div>`;
+  return `<details class="card fold"><summary>How hard? (RPE out of 10)</summary><table class="effort">${EFFORT.map(([n, l, d]) => `<tr><td class="rpe">${n}</td><td><b>${l}</b><div class="muted small">${esc(d)}</div></td></tr>`).join('')}</table></details>`;
 }
 function renderHIIT() {
   const d = today(), bi = blockInfo(d), pk = hiitPick(d), o = HIIT[pk], [n1, n2] = rotationAhead(d);
@@ -437,7 +442,7 @@ function renderHIIT() {
     ${Object.keys(HIIT).filter(k => !HIIT[k].hidden).map(k => { const x = HIIT[k]; return `<a class="card hcard${k === pk ? ' pick' : ''}" href="#/hiit/${k}" data-k="${k}">
       <div class="row between"><b class="hname">${esc(x.name)}</b>${k === pk ? '<span class="badge">This week</span>' : ''}</div>
       <div class="row wrap" style="gap:6px;margin-top:6px">${goalChip(x.goal)}<span class="chip">${k === 'z2' ? '30–45' : mins(x.phases)} min</span></div>
-      <div class="small" style="margin-top:6px">${esc(x.desc)}</div><div class="muted small">🧰 ${esc(x.equip)}</div></a>`; }).join('')}
+      <div class="small" style="margin-top:6px">${esc(x.desc)}</div><div class="muted small">${esc(x.equip)}</div></a>`; }).join('')}
     ${effortCard()}`;
 }
 function renderHIITSession(key) {
@@ -446,7 +451,7 @@ function renderHIITSession(key) {
   const bi = blockInfo(), base = o.variantOf || key, B = HIIT[base];
   view().innerHTML = `<div class="topbar"><a class="back" href="#/hiit" aria-label="Back">‹</a><div style="flex:1"><h1 style="font-size:22px;margin:0">${esc(o.name)}</h1><div class="subt">${esc(o.desc)}</div></div></div>
     <div class="row wrap" style="gap:6px">${goalChip(o.goal)}<span class="chip" id="hiit-mins">${mins(o.phases)} min</span>${key === hiitPick() ? '<span class="badge" style="margin:0">This week</span>' : ''}</div>
-    <div class="muted small" style="margin-top:6px">🧰 ${esc(o.equip)}</div>
+    <div class="muted small" style="margin-top:6px">${esc(o.equip)}</div>
     ${bi.phase === 'deload' && o.goal !== 'aero' ? '<div class="note deload"><b>Deload week:</b> do <a href="#/hiit/z2">Zone 2</a> instead.</div>' : ''}
     ${B.lengths ? `<div class="seg">${Object.entries(B.lengths).map(([k, m]) => `<button data-act="hiit-len" data-v="${k}" class="${k === key ? 'on' : ''}">${m} min</button>`).join('')}</div>` : ''}
     <div class="hiit-clock" id="hiit-clock"><div class="hiit-phase" id="hiit-phase">Ready</div><div class="hiit-time" id="hiit-time">0:00</div><div class="hiit-sub" id="hiit-sub"></div></div>
@@ -471,13 +476,13 @@ function renderMobility() {
       <a class="btn" style="margin-top:12px" href="#/mobility/${tk}">Start ${esc(mo.name)}</a></div>
     <h2>Pick any session</h2>
     <div class="card"><ul class="list">${MOB_ORDER.map(k => `<li><a class="item mobitem" href="#/mobility/${k}" data-k="${k}"><span><b>${DAYS[MOBILITY[k].day]}</b><br><span class="muted small">${esc(MOBILITY[k].name)}</span></span><span class="muted small">${mobMins(k)} min ›</span></a></li>`).join('')}</ul></div>
-    <div class="card"><b>Posture cues (Alexander Technique)</b><ul class="bul small">${AT_CUES.map(c => `<li>${esc(c)}</li>`).join('')}</ul>
-      <div class="muted small">Think the cue, don't force it. End every session lying in semi-supine.</div></div>
-    <div class="card"><b>How to</b><ul class="bul small">
+    <details class="card fold"><summary>Posture cues</summary><ul class="bul small">${AT_CUES.map(c => `<li>${esc(c)}</li>`).join('')}</ul>
+      <div class="muted small">Alexander Technique. Think the cue, don't force it. End every session lying in semi-supine.</div></details>
+    <details class="card fold"><summary>How to</summary><ul class="bul small">
       <li>Breathe slowly. Ease into each stretch: mild tension, never pain.</li>
       <li>Gym days: do it after training or in the evening, not right before heavy or explosive work.</li>
       <li>Through the day: screen at eye level, and a few chin tucks every hour.</li>
-      <li>Progress slowly. Range comes from doing a little most days.</li></ul></div>`;
+      <li>Progress slowly. Range comes from doing a little most days.</li></ul></details>`;
 }
 function renderMobSession(key) {
   const mo = MOBILITY[key]; if (!mo) return go('#/mobility');
@@ -497,7 +502,7 @@ function mobNowPaint() {
     box.dataset.mi = String(mi);
     box.innerHTML = `<div class="muted small">Move ${mi + 1} of ${MOBILITY[P.key].moves.length} · ${esc(moveTime(mv))}</div><h2 class="mobname">${esc(m)}</h2>
       <div class="parts">${demoHtml(m)}</div>
-      <div class="atcue">🧘 ${esc(AT_CUES[mi % AT_CUES.length])}</div>`;
+      <div class="atcue">${esc(AT_CUES[mi % AT_CUES.length])}</div>`;
   }
   MOBILITY[P.key].moves.forEach((_, i) => { const li = $('#mp-' + i); if (li) li.className = i === mi && !P.done ? 'on' : (i < mi || P.done ? 'past' : ''); });
 }
@@ -615,7 +620,8 @@ function eatenToggle(kind, id, on) {
 }
 function askBarHtml(slim) {
   const hint = speechSupported() ? 'Tap to dictate, then send' : 'Tap to type, or use the mic on your keyboard';
-  return `<button type="button" class="askbar${slim ? ' slim' : ''}" data-act="ask-open"><span class="askbar-mic" aria-hidden="true">🎤</span><span class="askbar-copy"><b>Ask AI</b><span>${esc(hint)}</span></span></button>`;
+  const mic = '<svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path fill="currentColor" d="M12 14a3 3 0 0 0 3-3V6a3 3 0 0 0-6 0v5a3 3 0 0 0 3 3Zm-7-3a1 1 0 1 0-2 0 9 9 0 0 0 8 8.94V22h2v-2.06A9 9 0 0 0 21 11a1 1 0 1 0-2 0 7 7 0 0 1-14 0Z"/></svg>';
+  return `<button type="button" class="askbar${slim ? ' slim' : ''}" data-act="ask-open"><span class="askbar-mic" aria-hidden="true">${mic}</span><span class="askbar-copy"><b>Ask AI</b><span>${esc(hint)}</span></span></button>`;
 }
 function macroStats(m) {
   return `<div class="grid4" style="margin-top:8px">
@@ -705,7 +711,7 @@ function microHtml(plate) {
     plate.snack.tags.broth ? 'Bone broth is on. Its sodium and minerals are not in these figures.' : '',
     !plate.snack.sel.fruit && !plate.snack.sel.oj ? 'Fruit and orange juice are both off, so vitamin C is lower than the handover day. It is not given a new total.' : ''
   ].filter(Boolean);
-  return `<div class="card"><b>Micronutrients</b>
+  return `<details class="card fold"><summary>Micronutrients</summary>
     <div class="muted small" style="margin-top:4px">For this plate, including the snacks that are on. Estimates against the Sillz guide, not lab results. Figures are rounded so a pick does not look more precise than it is. A default day still has the carrot, gold kiwi and 150 mL juice inside these figures.</div>
     <div class="chips">${m.covered.map(c => `<span class="chip">${esc(c)}</span>`).join('')}</div>
     <ul class="bul small">
@@ -722,7 +728,7 @@ function microHtml(plate) {
     <details class="micro-more"><summary>Handover table (mince, before the extra avocado)</summary>
       ${rows}
       <ul class="bul small">${m.footnotes.map(f => `<li>${esc(f)}</li>`).join('')}</ul>
-    </details></div>`;
+    </details></details>`;
 }
 function macroBit(m) {
   return `~${comma(m.kcal)} kcal · ${m.p} g protein · ${m.c} g carbs · ${m.f} g fat`;
@@ -753,7 +759,7 @@ function renderSnacks(plate, eatenDay) {
   const sel = plate.snack.sel;
   const groups = FOOD.snackGroups.map(g => {
     const items = FOOD.snackItems.filter(it => it.group === g.id).map(it => snackItemHtml(it, sel[it.id], !!(eatenDay && eatenDay.snacks[it.id]))).join('');
-    return `<div class="picklabel">${esc(g.title)}</div>${g.note ? `<div class="muted small">${esc(g.note)}</div>` : ''}${items}`;
+    return `<details class="fold"><summary>${esc(g.title)}</summary>${g.note ? `<div class="muted small">${esc(g.note)}</div>` : ''}${items}</details>`;
   }).join('');
   return `<div class="card"><h3>Snacks & drinks</h3>
     ${macroLine(plate.snack.macros)}
@@ -797,16 +803,17 @@ function renderMeals(st) {
     : `Protein is about ${Math.abs(proteinLeft)} g over the ${NUTRITION.protein} g target.`;
   return `<div class="card"><h3>1 · Yoghurt bowl</h3>${macroLine(plate.yoghurt)}
       ${choiceSeg('Sweetener', 'sweetener', [{ id: 'maple', name: 'Maple' }, { id: 'honey', name: 'Honey' }], plate.sweetener)}
-      ${portionsHtml(yoghurtItems)}
+      <details class="fold"><summary>What's in it</summary>${portionsHtml(yoghurtItems)}</details>
       ${eatenToggle('meal', 'yoghurt', eatenDay.meals.yoghurt)}</div>
-    <div class="card"><h3>2 · ${esc(FOOD.egg.name)}</h3>${macroLine(plate.egg)}${portionsHtml(FOOD.egg.items)}
+    <div class="card"><h3>2 · ${esc(FOOD.egg.name)}</h3>${macroLine(plate.egg)}
+      <details class="fold"><summary>What's in it</summary>${portionsHtml(FOOD.egg.items)}</details>
       ${eatenToggle('meal', 'egg', eatenDay.meals.egg)}</div>
     <div class="card"><h3>3 · ${esc(thirdName)}</h3>
       ${macroLine(plate.third)}
       ${choiceSeg('Third meal', 'meal3', [{ id: 'bowl', name: 'Protein bowl' }, { id: 'steak', name: 'Steak plate' }], plate.meal3)}
       ${plate.meal3 === 'bowl' ? `<div class="picklabel">Protein</div>${proteinPicks(plate.protein)}` : `<div class="note">Same sides as the bowl, served on a plate. Protein is the steak, not the mince swaps.</div>`}
       ${choiceSeg('Carb base', 'carb', [{ id: 'rice', name: 'Rice' }, { id: 'sweet', name: 'Sweet potato' }], plate.carb)}
-      ${portionsHtml(thirdItems)}
+      <details class="fold"><summary>What's on the plate</summary>${portionsHtml(thirdItems)}</details>
       <div class="note">${esc(salmonNote)}</div>
       ${eatenToggle('meal', 'third', eatenDay.meals.third)}
     </div>
@@ -822,7 +829,7 @@ function renderMeals(st) {
       ${eatenDay.custom.length ? '<div class="muted small">Added foods are in these calorie totals only, not the micronutrient estimates.</div>' : ''}
     </div>
     ${microHtml(plate)}
-    <div class="card"><b>How to eat this</b><ul class="bul small">${FOOD.rules.map(r => `<li>${esc(r)}</li>`).join('')}</ul></div>`;
+    <details class="card fold"><summary>How to eat this</summary><ul class="bul small">${FOOD.rules.map(r => `<li>${esc(r)}</li>`).join('')}</ul></details>`;
 }
 function renderFood(arg) {
   const mode = arg === 'shop' ? 'shop' : 'meals';
@@ -840,34 +847,34 @@ function foodArg() {
 
 function renderRules() {
   view().innerHTML = `<h1>The Rules</h1>
-  <div class="card"><h3>Effort</h3><ul class="bul">
+  <details class="card fold"><summary>Effort</summary><ul class="bul">
     <li><b>RIR</b> (reps in reserve) = how many more good reps you could have done.</li>
     <li>Main lifts: stop at 1–2 RIR. Accessories: 0–1 RIR.</li>
     <li>Explosive moves: every rep fast. Stop the set if speed drops.</li>
-    <li>Every exercise shows a tempo chip. Follow it.</li></ul></div>
-  <div class="card"><h3>Tempo</h3><ul class="list">${Object.keys(TEMPO_INFO).map(k => `<li>${tchip(k)}<div class="small" style="margin-top:6px">${esc(TEMPO_INFO[k].cue)}</div></li>`).join('')}</ul></div>
-  <div class="card"><h3>Week 1: find your weights</h3><ul class="bul">
+    <li>Every exercise shows a tempo chip. Follow it.</li></ul></details>
+  <details class="card fold"><summary>Tempo</summary><ul class="list">${Object.keys(TEMPO_INFO).map(k => `<li>${tchip(k)}<div class="small" style="margin-top:6px">${esc(TEMPO_INFO[k].cue)}</div></li>`).join('')}</ul></details>
+  <details class="card fold"><summary>Week 1: find your weights</summary><ul class="bul">
     <li>Full sets from day one.</li><li>Pick weights you could do <b>2–3 more reps</b> with. Log them.</li>
-    <li>From week 2, push to the normal effort targets and start adding reps.</li></ul></div>
-  <div class="card"><h3>Going up (progressive overload)</h3><ul class="bul">
+    <li>From week 2, push to the normal effort targets and start adding reps.</li></ul></details>
+  <details class="card fold"><summary>Going up (progressive overload)</summary><ul class="bul">
     <li><b>Add reps first.</b> For 3 × 8–10: 8, 8, 8 → 9, 9, 8 → 10, 10, 10.</li>
     <li><b>Then add weight</b> once every set hits the top of the range with good form.</li>
     <li>Upper body: <b>+1–2.5 kg</b>. Lower body: <b>+2.5–5 kg</b>.</li>
-    <li>Reps drop back to the bottom of the range. Build them up again.</li></ul></div>
-  <div class="card"><h3>Heavy week (every 5th week)</h3><ul class="bul">
+    <li>Reps drop back to the bottom of the range. Build them up again.</li></ul></details>
+  <details class="card fold"><summary>Heavy week (every 5th week)</summary><ul class="bul">
     <li>Main lifts (marked <span class="badge" style="margin:0">Main</span>): <b>3 × 3–6</b>, heavier than normal.</li>
-    <li>Accessories stay the same. Then start the next block.</li></ul></div>
-  <div class="card"><h3>Back off (deload) if any of these happen</h3><ul class="bul">
+    <li>Accessories stay the same. Then start the next block.</li></ul></details>
+  <details class="card fold"><summary>Back off (deload) if any of these happen</summary><ul class="bul">
     <li>Lifts go backwards two sessions in a row.</li><li>Joints are sore (not just muscle soreness).</li>
     <li>Sleep is poor or you feel flat for a week.</li>
     <li>Lighter week = <b>same exercises, half the sets, same weights or 10% lighter</b>. HIIT becomes easy cycling. Then back to normal.</li>
-    <li>Turn on <a href="#/settings">Deload week</a> in Settings and the app halves your sets.</li></ul></div>
-  <div class="card"><h3>Missed or busy days</h3><ul class="bul">
+    <li>Turn on <a href="#/settings">Deload week</a> in Settings and the app halves your sets.</li></ul></details>
+  <details class="card fold"><summary>Missed or busy days</summary><ul class="bul">
     <li>Missed a session? Don't double up. Do the next one.</li>
-    <li>Short on time? Explosive moves and the 2 main lifts only.</li></ul></div>
-  <div class="card"><h3>Habits</h3><ul class="bul">
+    <li>Short on time? Explosive moves and the 2 main lifts only.</li></ul></details>
+  <details class="card fold"><summary>Habits</summary><ul class="bul">
     <li>Protein 175 g and 2500 kcal a day.</li><li>Sleep 8 hours, up with the sun.</li>
-    <li>No phone during rest. Breathe and drink water.</li><li>12+ months for a real transformation. Be better, not perfect.</li></ul></div>`;
+    <li>No phone during rest. Breathe and drink water.</li><li>12+ months for a real transformation. Be better, not perfect.</li></ul></details>`;
 }
 
 function renderSettings() {
@@ -958,7 +965,7 @@ function paintMic() {
   if (b) {
     b.classList.toggle('on', aiListening);
     b.setAttribute('aria-pressed', aiListening ? 'true' : 'false');
-    b.textContent = aiListening ? 'Stop' : (speechSupported() ? '🎤 Speak' : '🎤 Type');
+    b.textContent = aiListening ? 'Stop' : (speechSupported() ? 'Speak' : 'Type');
     b.setAttribute('aria-label', aiListening ? 'Stop dictation' : (speechSupported() ? 'Dictate' : 'Type instead'));
   }
   if (live) {
