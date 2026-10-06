@@ -614,7 +614,7 @@ function eatenToggle(kind, id, on) {
   return `<label class="todaytick"><input type="checkbox" data-eaten="${esc(kind)}" data-id="${esc(id)}"${on ? ' checked' : ''}><span>Eaten today</span></label>`;
 }
 function askBarHtml(slim) {
-  const hint = speechSupported() ? 'Tap and say what you ate' : 'Tap to type, or use the mic on your keyboard';
+  const hint = speechSupported() ? 'Tap to dictate, then send' : 'Tap to type, or use the mic on your keyboard';
   return `<button type="button" class="askbar${slim ? ' slim' : ''}" data-act="ask-open"><span class="askbar-mic" aria-hidden="true">🎤</span><span class="askbar-copy"><b>Ask AI</b><span>${esc(hint)}</span></span></button>`;
 }
 function macroStats(m) {
@@ -879,7 +879,7 @@ function renderSettings() {
   <div class="card">
     <label class="toggle"><span><b>Deload week</b><br><span class="muted small">Half the sets, same weights or 10% lighter. Turn off when you're back to normal.</span></span><input type="checkbox" id="set-deload" ${settings.deload ? 'checked' : ''}></label></div>
   <div class="card"><b>Ask AI</b>
-    <div class="muted small" style="margin:4px 0 8px">Optional. Say what you ate from Home, or ask what's left today. ${geminiKey() ? 'A Gemini key is saved on this phone.' : 'No key saved yet.'}</div>
+    <div class="muted small" style="margin:4px 0 8px">Optional. Dictate or type what you ate, fix the words, then tap Send. ${geminiKey() ? 'A Gemini key is saved on this phone.' : 'No key saved yet.'}</div>
     <input id="set-key" class="keyin" type="password" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="${geminiKey() ? 'Paste a new key to replace it' : 'Paste your Gemini API key'}">
     <div class="grid2" style="margin-top:8px">
       <button type="button" class="btn small" data-act="gemini-save" data-for="set-key">Save key</button>
@@ -925,7 +925,7 @@ function importLog() {
 /* ---------- ask AI ---------- */
 let aiChat = load(LS.aiChat, []);
 if (!Array.isArray(aiChat)) aiChat = [];
-let aiRec = null, aiRecGen = 0, aiListening = false, aiSendOnEnd = false, aiBusy = false, aiPendingListen = false, aiSendTimer = null;
+let aiRec = null, aiRecGen = 0, aiListening = false, aiBusy = false, aiPendingListen = false, aiPrefix = '', aiQuietEnd = false, aiViewportBound = false;
 
 function speechSupported() {
   return !!(window.SpeechRecognition || window.webkitSpeechRecognition);
@@ -947,13 +947,48 @@ function pushAi(msg) {
   if (aiChat.length > 30) aiChat = aiChat.slice(-30);
   save(LS.aiChat, aiChat);
 }
+function composeDictation(prefix, spoken) {
+  const said = String(spoken || '').replace(/\s+/g, ' ').trim();
+  if (!said) return prefix;
+  if (!prefix) return said;
+  return prefix + (/\s$/.test(prefix) ? '' : ' ') + said;
+}
 function paintMic() {
   const b = $('#ask-mic'), live = $('#ask-live');
   if (b) {
     b.classList.toggle('on', aiListening);
-    b.textContent = aiListening ? 'Listening… tap to send' : (speechSupported() ? '🎤 Speak' : '🎤 Type');
+    b.setAttribute('aria-pressed', aiListening ? 'true' : 'false');
+    b.textContent = aiListening ? 'Stop' : (speechSupported() ? '🎤 Speak' : '🎤 Type');
+    b.setAttribute('aria-label', aiListening ? 'Stop dictation' : (speechSupported() ? 'Dictate' : 'Type instead'));
   }
-  if (live) live.classList.toggle('hidden', !aiListening);
+  if (live) {
+    live.classList.toggle('hidden', !aiListening);
+    if (aiListening) live.textContent = 'Listening…';
+  }
+}
+function fitAskSheet() {
+  const sheet = document.querySelector('.ask-sheet');
+  const ask = $('#ask');
+  if (!sheet) return;
+  const open = ask && !ask.classList.contains('hidden');
+  if (!open || !window.visualViewport) {
+    sheet.style.height = '';
+    sheet.style.transform = '';
+    document.body.classList.remove('ask-tight');
+    return;
+  }
+  const vv = window.visualViewport;
+  const gap = Math.max(0, Math.round(window.innerHeight - (vv.offsetTop + vv.height)));
+  const h = Math.max(240, Math.min(Math.round(vv.height * 0.92), 760));
+  sheet.style.height = h + 'px';
+  sheet.style.transform = gap ? 'translateY(-' + gap + 'px)' : '';
+  document.body.classList.toggle('ask-tight', vv.height < 540);
+}
+function bindAskViewport() {
+  if (aiViewportBound || !window.visualViewport) return;
+  aiViewportBound = true;
+  visualViewport.addEventListener('resize', fitAskSheet);
+  visualViewport.addEventListener('scroll', fitAskSheet);
 }
 function renderAskLog() {
   const log = $('#ask-log');
@@ -975,7 +1010,7 @@ function renderAskLog() {
         <input id="ask-key" class="keyin" type="password" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="Paste your Gemini API key">
         <button type="button" class="btn small" style="margin-top:8px" data-act="gemini-save" data-for="ask-key">Save key</button>
       </div>`;
-  const empty = aiChat.length ? '' : `<div class="muted small" style="margin:8px 0">Say what you ate, or ask how much protein is left. Target is ${NUTRITION.protein} g protein and ${comma(NUTRITION.kcal)} kcal.</div>`;
+  const empty = aiChat.length ? '' : `<div class="muted small" style="margin:8px 0">Dictate or type what you ate, then tap Send. Or ask how much protein is left. Target is ${NUTRITION.protein} g protein and ${comma(NUTRITION.kcal)} kcal.</div>`;
   log.innerHTML = `${keyHtml}
     <label class="toggle"><span><b>Read replies aloud</b><br><span class="muted small">Short replies. Australian English when the phone has that voice.</span></span>
       <input type="checkbox" id="ask-speak" ${speakEnabled() ? 'checked' : ''}></label>
@@ -987,6 +1022,8 @@ function openAsk() {
   document.body.classList.add('ask-on');
   renderAskLog();
   paintMic();
+  bindAskViewport();
+  fitAskSheet();
   if (!geminiKey()) {
     aiPendingListen = speechSupported();
     const input = $('#ask-key');
@@ -998,15 +1035,27 @@ function openAsk() {
 }
 function closeAsk() {
   aiPendingListen = false;
-  stopListen(false);
+  stopListen();
   $('#ask').classList.add('hidden');
   document.body.classList.remove('ask-on');
+  fitAskSheet();
   if (window.speechSynthesis) { try { speechSynthesis.cancel(); } catch (e) {} }
+}
+function askInput() { return $('#ask-input'); }
+function writeDictation(spoken) {
+  const box = askInput();
+  if (!box) return;
+  box.value = composeDictation(aiPrefix, spoken);
+  if (document.activeElement === box) {
+    const end = box.value.length;
+    try { box.setSelectionRange(end, end); } catch (e) {}
+  }
+  box.scrollTop = box.scrollHeight;
 }
 function startListen() {
   const Ctor = window.SpeechRecognition || window.webkitSpeechRecognition;
   if (!Ctor || aiBusy) {
-    const input = $('#ask-input');
+    const input = askInput();
     if (input) input.focus();
     if (!Ctor) {
       pushAi({ role: 'model', text: 'This browser has no speech recognition. Type instead, or use the mic on the keyboard.', at: Date.now(), local: true, warn: true });
@@ -1014,70 +1063,86 @@ function startListen() {
     }
     return;
   }
-  if (aiRec) { aiSendOnEnd = false; try { aiRec.abort(); } catch (e) {} }
+  if (aiListening) return;
+  if (aiRec) {
+    const old = aiRec;
+    aiRec = null;
+    aiRecGen++;
+    try { old.abort(); } catch (e) {}
+  }
+  aiQuietEnd = false;
+  const input = askInput();
+  aiPrefix = input ? input.value : '';
   const gen = ++aiRecGen;
-  aiRec = new Ctor();
-  aiRec.lang = 'en-AU';
-  aiRec.interimResults = true;
-  aiRec.continuous = false;
-  aiRec.maxAlternatives = 1;
-  aiSendOnEnd = true;
+  const rec = new Ctor();
+  aiRec = rec;
+  rec.lang = 'en-AU';
+  rec.interimResults = true;
+  rec.continuous = false;
+  rec.maxAlternatives = 1;
   aiListening = true;
-  const live = $('#ask-live');
-  if (live) { live.textContent = 'Listening…'; live.classList.remove('hidden'); }
-  const input = $('#ask-input');
-  if (input) input.value = '';
   paintMic();
-  aiRec.onresult = ev => {
+  rec.onresult = ev => {
     if (gen !== aiRecGen) return;
-    let text = '';
-    for (let i = 0; i < ev.results.length; i++) text += ev.results[i][0].transcript;
-    text = text.trim();
-    if (input) input.value = text;
-    if (live) live.textContent = text || 'Listening…';
+    let spoken = '';
+    for (let i = 0; i < ev.results.length; i++) spoken += ev.results[i][0].transcript;
+    writeDictation(spoken);
   };
-  aiRec.onerror = ev => {
+  rec.onerror = ev => {
     if (gen !== aiRecGen) return;
-    aiSendOnEnd = false;
     const code = ev && ev.error;
     if (!code || code === 'aborted') return;
+    if (code === 'no-speech') {
+      if (aiQuietEnd) return;
+      const box = askInput();
+      const now = box ? box.value.trim() : '';
+      if (now && now !== String(aiPrefix || '').trim()) return;
+      aiListening = false;
+      paintMic();
+      pushAi({ role: 'model', text: 'Didn\'t catch that. Tap Speak and try again.', at: Date.now(), local: true, warn: true });
+      renderAskLog();
+      return;
+    }
     aiListening = false;
     paintMic();
     let msg = 'Mic didn\'t start. Type instead, or use the mic on the keyboard.';
     if (code === 'not-allowed' || code === 'service-not-allowed') msg = 'Mic is blocked. Type instead, or allow the microphone.';
     else if (code === 'network') msg = 'Speech needs internet. Type instead, or use the mic on the keyboard.';
-    else if (code === 'no-speech') msg = 'Didn\'t catch that. Tap Speak and try again.';
     pushAi({ role: 'model', text: msg, at: Date.now(), local: true, warn: true });
     renderAskLog();
   };
-  aiRec.onend = () => {
+  rec.onend = () => {
     if (gen !== aiRecGen) return;
-    const send = aiSendOnEnd;
+    // iOS ends recognition by itself after a pause. Keep whatever landed in the box.
     aiListening = false;
-    aiSendOnEnd = false;
+    if (aiRec === rec) aiRec = null;
     paintMic();
-    if (!send) return;
-    const text = ((input && input.value) || '').trim();
-    if (!text) return;
-    clearTimeout(aiSendTimer);
-    aiSendTimer = setTimeout(() => sendAsk(text), 350);
   };
-  try { aiRec.start(); }
+  try { rec.start(); }
   catch (e) {
     aiListening = false;
-    aiSendOnEnd = false;
+    if (aiRec === rec) aiRec = null;
     paintMic();
     pushAi({ role: 'model', text: 'Mic didn\'t start. Type instead, or use the mic on the keyboard.', at: Date.now(), local: true, warn: true });
     renderAskLog();
   }
 }
-function stopListen(send) {
-  clearTimeout(aiSendTimer);
-  if (!aiRec || !aiListening) { aiListening = false; aiSendOnEnd = false; paintMic(); return; }
-  aiSendOnEnd = !!send;
+function stopListen() {
+  aiQuietEnd = true;
   aiListening = false;
-  try { if (send) aiRec.stop(); else aiRec.abort(); } catch (e) {}
   paintMic();
+  const rec = aiRec;
+  if (!rec) return;
+  try { rec.stop(); } catch (e) {}
+}
+function endListen() {
+  aiQuietEnd = true;
+  aiListening = false;
+  aiRecGen++;
+  paintMic();
+  const rec = aiRec;
+  aiRec = null;
+  if (rec) { try { rec.abort(); } catch (e) {} }
 }
 function speakReply(text) {
   if (!speakEnabled() || !window.speechSynthesis || !text) return;
@@ -1116,7 +1181,6 @@ function undoAi() {
 async function sendAsk(text) {
   text = String(text || '').trim();
   if (!text || aiBusy) return;
-  clearTimeout(aiSendTimer);
   if (!geminiKey()) {
     const input = $('#ask-input');
     if (input) input.value = text;
@@ -1313,7 +1377,7 @@ document.addEventListener('click', e => {
       if (input) input.focus();
       pushAi({ role: 'model', text: 'This browser has no speech recognition. Type instead, or use the mic on the keyboard.', at: Date.now(), local: true, warn: true });
       renderAskLog();
-    } else if (aiListening) stopListen(true);
+    } else if (aiListening) stopListen();
     else startListen();
   } else if (act === 'gemini-save') {
     const field = document.getElementById(b.dataset.for || '');
@@ -1339,18 +1403,26 @@ document.addEventListener('click', e => {
 document.addEventListener('submit', e => {
   if (e.target.id !== 'ask-form') return;
   e.preventDefault();
-  if (aiListening) stopListen(false);
-  sendAsk($('#ask-input').value);
+  const text = askInput() ? askInput().value : '';
+  endListen();
+  sendAsk(text);
 });
 document.addEventListener('keydown', e => {
   if (e.key === 'Escape' && !$('#ask').classList.contains('hidden')) { closeAsk(); return; }
   if (e.key === 'Enter' && e.target.id === 'ask-input' && !e.shiftKey) {
     e.preventDefault();
-    if (aiListening) stopListen(false);
-    sendAsk(e.target.value);
+    const text = e.target.value;
+    endListen();
+    sendAsk(text);
   }
 });
 $('#ask').addEventListener('click', e => { if (e.target.id === 'ask') closeAsk(); });
+const askBox = $('#ask-input');
+if (askBox) {
+  const editDictation = () => { if (aiListening) endListen(); fitAskSheet(); };
+  askBox.addEventListener('pointerdown', editDictation);
+  askBox.addEventListener('focus', () => { setTimeout(fitAskSheet, 50); setTimeout(fitAskSheet, 300); });
+}
 
 /* ---------- router ---------- */
 function go(h) { location.hash = h; }
