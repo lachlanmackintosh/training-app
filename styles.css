@@ -5,8 +5,8 @@
 }
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 html,body{margin:0;background:var(--bg);color:var(--text);font:16px/1.4 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}
-body{padding-top:var(--safe-t);padding-bottom:calc(76px + var(--safe-b))}
-body.timer-on{padding-bottom:calc(190px + var(--safe-b))}
+body{padding-top:var(--safe-t);padding-bottom:calc(140px + var(--safe-b))}
+body.timer-on{padding-bottom:calc(260px + var(--safe-b))}
 main{max-width:560px;margin:0 auto;padding:12px 14px 24px}
 h1{font-size:26px;margin:6px 0 2px} h2{font-size:20px;margin:22px 0 10px} h3{font-size:18px;margin:0}
 a{color:var(--blue)}
@@ -185,7 +185,7 @@ details.card summary{cursor:pointer;min-height:36px;line-height:36px}
 .moblist li.on{color:var(--accent);font-weight:700}
 .moblist li.past{color:var(--muted)}
 .neck{display:inline-block;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.05em;color:#7fd1ff;border:1px solid #2c5a73;border-radius:6px;padding:1px 5px;margin-left:4px;vertical-align:middle}
-.linkbtn{background:none;border:0;color:var(--blue);font-size:15px;min-height:40px;padding:0 4px}
+.linkbtn{background:none;border:0;color:var(--blue);font-size:15px;font-weight:700;min-height:44px;padding:0 4px;cursor:pointer}
 .demo img.thumb{object-fit:cover}
 .demo .nolink small{display:block;margin-top:4px;font-size:12px}
 .mobcard{border-color:#1f6b52}
@@ -232,3 +232,42 @@ details.card summary{cursor:pointer;min-height:36px;line-height:36px}
 .micro-more{margin-top:8px}
 .micro-more summary{cursor:pointer;min-height:44px;display:flex;align-items:center;color:var(--blue);font-weight:700}
 .gap{color:var(--accent2);font-weight:700}
+
+/* ask AI */
+.vh{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);border:0}
+.askbar{display:flex;align-items:center;gap:12px;width:100%;text-align:left;margin:12px 0 2px;padding:12px 14px;border-radius:16px;border:1px solid #6b2a1b;background:linear-gradient(135deg,#3a130b,#171a1f 72%);color:var(--text);min-height:68px;cursor:pointer}
+.askbar-mic{width:48px;height:48px;border-radius:50%;background:var(--accent);display:flex;align-items:center;justify-content:center;font-size:24px;flex:none}
+.askbar-copy{display:flex;flex-direction:column;gap:2px}
+.askbar-copy b{font-size:18px}
+.askbar-copy span{color:var(--muted);font-size:14px;font-weight:600}
+.askbar.slim{margin-top:12px;min-height:56px;padding:8px 12px}
+.askbar.slim .askbar-mic{width:40px;height:40px;font-size:20px}
+.askfab{position:fixed;right:14px;bottom:calc(78px + var(--safe-b));z-index:45;display:flex;align-items:center;gap:6px;min-height:52px;padding:0 16px 0 14px;border:0;border-radius:999px;background:var(--accent);color:#fff;font-size:16px;font-weight:800;box-shadow:0 6px 20px rgba(0,0,0,.45);cursor:pointer}
+.askfab span{font-size:15px}
+body.timer-on .askfab{bottom:calc(200px + var(--safe-b))}
+body.ask-on{overflow:hidden}
+body.ask-on .askfab{display:none}
+.ask{position:fixed;inset:0;z-index:70;background:rgba(0,0,0,.55);display:flex;align-items:flex-end;justify-content:center}
+.ask-sheet{background:var(--bg);width:min(560px,100%);height:min(92vh,760px);border-radius:18px 18px 0 0;display:flex;flex-direction:column;border:1px solid var(--line);padding-bottom:var(--safe-b)}
+.ask-head{display:flex;align-items:center;gap:8px;padding:12px 14px;border-bottom:1px solid var(--line)}
+.ask-head h2{flex:1;margin:0;font-size:20px}
+.ask-head .btn{width:auto}
+.ask-log{flex:1;overflow:auto;min-height:0;padding:12px 14px 4px}
+.ask-msg{margin:8px 0;padding:10px 12px;border-radius:14px;max-width:95%;white-space:pre-wrap}
+.ask-msg.user{background:#2c140e;margin-left:28px}
+.ask-msg.model{background:var(--card);border:1px solid var(--line);margin-right:16px}
+.ask-msg.warn{border-color:#6b5317}
+.ask-changes{margin-top:6px;color:var(--accent2);font-size:14px;font-weight:700}
+.ask-form{padding:8px 14px 12px;border-top:1px solid var(--line)}
+.ask-live{font-weight:800;color:var(--accent);min-height:22px;margin-bottom:4px}
+.ask-form textarea{width:100%;border-radius:12px;border:1px solid var(--line);background:#0b0d10;color:var(--text);font:16px/1.35 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;padding:10px 12px;resize:none}
+.ask-row{display:flex;gap:8px;margin-top:8px}
+.ask-row .btn{flex:1}
+#ask-mic.on{background:var(--good);color:#06240f}
+.ask-note{margin:8px 0 0;color:var(--muted);font-size:13px}
+input.keyin{height:50px;width:100%;border-radius:12px;border:1px solid var(--line);background:#0b0d10;color:var(--text);font-size:16px;padding:0 12px}
+.todaytick{display:flex;align-items:center;gap:8px;margin-top:10px;font-weight:700;min-height:44px}
+.todaytick input{width:22px;height:22px;accent-color:var(--good)}
+.estimate{display:inline-block;font-size:11px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;color:var(--accent2);border:1px solid #6b5317;border-radius:6px;padding:1px 6px;margin-left:6px;vertical-align:middle}
+.customfood{padding:10px 0;border-top:1px solid var(--line)}
+.customfood:first-of-type{border-top:0}

@@ -1,7 +1,7 @@
 /* Baki Program (Lockie Training Program) — plain JS, no build step. Data in data.js. */
 (() => {
 'use strict';
-const LS = { log: 'lockie.log.v1', draft: 'lockie.draft.v1', settings: 'lockie.settings.v1', timer: 'lockie.timer.v1', food: 'lockie.food.v2' };
+const LS = { log: 'lockie.log.v1', draft: 'lockie.draft.v1', settings: 'lockie.settings.v1', timer: 'lockie.timer.v1', food: 'lockie.food.v2', gemini: 'lockie.gemini.key', aiChat: 'lockie.ai.chat.v1', aiSpeak: 'lockie.ai.speak.v1', aiUndo: 'lockie.ai.undo.v1' };
 const DEFAULT_SETTINGS = { start: '2026-10-05', rampEveryBlock: true, deload: false, swaps: {} };
 const $ = (s, el = document) => el.querySelector(s);
 const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -22,10 +22,25 @@ function foodState() {
     carb: (from.carb || src.carb) === 'sweet' ? 'sweet' : 'rice'
   };
   const snacks = src.snacks && typeof src.snacks === 'object' && !Array.isArray(src.snacks) ? src.snacks : null;
-  return { picks, snacks, checks: checksSrc };
+  const daysIn = src.days && typeof src.days === 'object' && !Array.isArray(src.days) ? src.days : {};
+  const days = {};
+  for (const k of Object.keys(daysIn)) {
+    if (/^\d{4}-\d{2}-\d{2}$/.test(k)) days[k] = normaliseFoodDay(daysIn[k]);
+  }
+  return { picks, snacks, checks: checksSrc, days };
+}
+function foodDayCutoff() {
+  const d = today();
+  d.setDate(d.getDate() - 21);
+  return ymd(d);
 }
 function saveFood(st) {
-  const payload = { picks: st.picks, checks: st.checks };
+  const min = foodDayCutoff();
+  const days = {};
+  for (const k of Object.keys(st.days || {})) {
+    if (/^\d{4}-\d{2}-\d{2}$/.test(k) && k >= min) days[k] = normaliseFoodDay(st.days[k]);
+  }
+  const payload = { picks: st.picks, checks: st.checks || {}, days };
   if (st.snacks) payload.snacks = st.snacks;
   save(LS.food, payload);
 }
@@ -230,16 +245,22 @@ function renderHome() {
   }
   const mk = mobKeyFor(d), mo = MOBILITY[mk];
   const n = NUTRITION;
-  const food = foodState(), plate = foodPlate(food.picks, food.snacks), ft = plate.day;
+  const food = foodState(), plate = foodPlate(food.picks, food.snacks);
+  const eatenDay = normaliseFoodDay(food.days[ds]);
+  const planned = plannedDayMacros(plate, eatenDay), eaten = eatenDayMacros(plate, eatenDay);
   const thirdName = plate.meal3 === 'steak' ? 'Steak plate' : 'Protein bowl';
   const swapLine = [
     FOOD.sweeteners[plate.sweetener].name,
     FOOD.proteins[plate.proteinId].short,
     FOOD.carbs[plate.carb].name
   ].join(' · ');
+  const eatenLine = (eaten.kcal || eaten.p)
+    ? `Eaten ~${comma(eaten.kcal)} kcal · ${eaten.p} g protein. `
+    : 'Nothing ticked as eaten yet. ';
   view().innerHTML = `
   <div class="row between"><div><div class="muted small">${esc(fmtLong(d))}</div><h1 class="apph">${esc(APP_HEADING)}</h1></div>
     <a class="iconbtn" href="#/settings" aria-label="Settings">⚙️</a></div>
+  ${askBarHtml(false)}
   <div class="card"><div class="row between wrap"><b>${esc(weekLine(bi))}</b>${phaseChip(bi)}</div>
     <div class="muted small" style="margin-top:6px">${esc(PHASES[bi.phase].short)}</div></div>
   <div class="card hero">${todayHtml}</div>
@@ -249,7 +270,7 @@ function renderHome() {
     <a class="btn ghost" style="margin-top:10px" href="#/mobility/${mk}">Start mobility</a></div>
   <div class="card foodcard"><div class="row between wrap"><b>Today's meals</b><span class="muted small">${esc(swapLine)}</span></div>
     <div style="margin-top:4px;font-weight:700;font-size:17px">Yoghurt bowl · Egg meal · ${esc(thirdName)}</div>
-    <div class="muted small">~${comma(ft.kcal)} kcal · ${ft.p} g protein · ${ft.c} g carbs · ${ft.f} g fat with these swaps and snacks. The target board below is still 2,500 kcal.</div>
+    <div class="muted small">${eatenLine}Planned ~${comma(planned.kcal)} kcal · ${planned.p} g protein. Target board is still 2,500 kcal and 175 g protein.</div>
     ${plate.snack.custom ? `<div class="muted small">Snacks: ${esc(plate.snack.picked.length ? plate.snack.picked.map(x => x.short).join(' · ') : 'none')}</div>` : ''}
     <a class="btn ghost" style="margin-top:10px" href="#/food">Open meals</a>
     <a class="small" style="display:inline-block;margin-top:8px;min-height:36px;line-height:36px" href="#/food/shop">Shopping list</a></div>
@@ -589,6 +610,21 @@ function renderHistory(m) {
 function macroLine(m) {
   return `<div class="macros"><b>~${comma(m.kcal)} kcal</b><span>${m.p} g protein · ${m.c} g carbs · ${m.f} g fat</span></div>`;
 }
+function eatenToggle(kind, id, on) {
+  return `<label class="todaytick"><input type="checkbox" data-eaten="${esc(kind)}" data-id="${esc(id)}"${on ? ' checked' : ''}><span>Eaten today</span></label>`;
+}
+function askBarHtml(slim) {
+  const hint = speechSupported() ? 'Tap and say what you ate' : 'Tap to type, or use the mic on your keyboard';
+  return `<button type="button" class="askbar${slim ? ' slim' : ''}" data-act="ask-open"><span class="askbar-mic" aria-hidden="true">🎤</span><span class="askbar-copy"><b>Ask AI</b><span>${esc(hint)}</span></span></button>`;
+}
+function macroStats(m) {
+  return `<div class="grid4" style="margin-top:8px">
+    <div class="stat"><b>~${comma(m.kcal)}</b><span>kcal</span></div>
+    <div class="stat"><b>${m.p}</b><span>g protein</span></div>
+    <div class="stat"><b>${m.c}</b><span>g carbs</span></div>
+    <div class="stat"><b>${m.f}</b><span>g fat</span></div>
+  </div>`;
+}
 function portionsHtml(items) {
   return `<ul class="portions">${items.map(it => {
     const cls = [it.optional ? 'opt' : '', it.picked ? 'picked' : ''].filter(Boolean).join(' ');
@@ -691,31 +727,32 @@ function microHtml(plate) {
 function macroBit(m) {
   return `~${comma(m.kcal)} kcal · ${m.p} g protein · ${m.c} g carbs · ${m.f} g fat`;
 }
-function snackItemHtml(it, portionId) {
+function snackItemHtml(it, portionId, eaten) {
   const on = !!portionId;
   const ids = Object.keys(it.portions);
+  const tick = on ? eatenToggle('snack', it.id, eaten) : '';
   if (it.choose) {
     const rows = ids.map(id => {
       const p = it.portions[id], isOn = id === portionId;
       return `<button type="button" class="pickrow${isOn ? ' on' : ''}" data-act="snack-portion" data-id="${esc(it.id)}" data-v="${esc(id)}" data-off="1" aria-pressed="${isOn ? 'true' : 'false'}"><span>${esc(p.name)}</span><span class="muted small">${esc(p.label)} · ${macroBit(p.macros)}</span>${p.note ? `<span class="muted small">${esc(p.note)}</span>` : ''}</button>`;
     }).join('');
-    return `<div class="picklabel">${esc(it.name)}</div>${it.note ? `<div class="muted small">${esc(it.note)}</div>` : ''}<div class="pick" role="group" aria-label="${esc(it.name)}">${rows}</div>`;
+    return `<div class="picklabel">${esc(it.name)}</div>${it.note ? `<div class="muted small">${esc(it.note)}</div>` : ''}<div class="pick" role="group" aria-label="${esc(it.name)}">${rows}</div>${tick}`;
   }
   const shown = it.portions[portionId] || it.portions[it.defaultPortion];
   const sub = on ? `${shown.label} · ${macroBit(shown.macros)}` : `Off · ${shown.label} would add ${macroBit(shown.macros)}`;
   const note = [(on && shown.note) || it.note, shown.caffeine ? `Caffeine about ${shown.caffeine}.` : ''].filter(Boolean).join(' ');
   const toggle = `<button type="button" class="pickrow snackrow${on ? ' on' : ''}" data-act="snack-toggle" data-id="${esc(it.id)}" aria-pressed="${on ? 'true' : 'false'}"><span>${esc(it.name)}${it.occasional ? ' <span class="badge">Occasional</span>' : ''}</span><span class="muted small">${esc(sub)}</span>${note ? `<span class="muted small">${esc(note)}</span>` : ''}</button>`;
-  if (ids.length < 2) return toggle;
+  if (ids.length < 2) return toggle + tick;
   const seg = `<div class="seg foodpick snackseg" role="group" aria-label="${esc(it.name)} portion">${ids.map(id => {
     const p = it.portions[id], isOn = id === portionId;
     return `<button type="button" class="${isOn ? 'on' : ''}" data-act="snack-portion" data-id="${esc(it.id)}" data-v="${esc(id)}" aria-pressed="${isOn ? 'true' : 'false'}">${esc(p.chip || p.label)}</button>`;
   }).join('')}</div>`;
-  return toggle + seg;
+  return toggle + seg + tick;
 }
-function renderSnacks(plate) {
+function renderSnacks(plate, eatenDay) {
   const sel = plate.snack.sel;
   const groups = FOOD.snackGroups.map(g => {
-    const items = FOOD.snackItems.filter(it => it.group === g.id).map(it => snackItemHtml(it, sel[it.id])).join('');
+    const items = FOOD.snackItems.filter(it => it.group === g.id).map(it => snackItemHtml(it, sel[it.id], !!(eatenDay && eatenDay.snacks[it.id]))).join('');
     return `<div class="picklabel">${esc(g.title)}</div>${g.note ? `<div class="muted small">${esc(g.note)}</div>` : ''}${items}`;
   }).join('');
   return `<div class="card"><h3>Snacks & drinks</h3>
@@ -723,8 +760,21 @@ function renderSnacks(plate) {
     <div class="muted small" style="margin-top:4px">${esc(FOOD.snackIntro)}</div>
     ${groups}</div>`;
 }
+function renderCustomFoods(day) {
+  if (!day.custom.length) return '';
+  const rows = day.custom.map(c => `<div class="customfood">
+      <div class="row between"><b>${esc(c.name)}<span class="estimate">Estimate</span></b>
+        <button type="button" class="linkbtn" data-act="custom-del" data-id="${esc(c.id)}">Delete</button></div>
+      <div class="muted small">${macroBit({ kcal: c.kcal, p: c.p, c: c.c, f: c.f })}</div>
+      ${eatenToggle('custom', c.id, c.eaten)}
+    </div>`).join('');
+  return `<div class="card"><h3>Added today</h3>
+    <div class="muted small">Not on the meal plan. Counted in today's totals. Each one is an estimate until you delete it.</div>
+    ${rows}</div>`;
+}
 function renderMeals(st) {
   const plate = foodPlate(st.picks, st.snacks);
+  const eatenDay = normaliseFoodDay(st.days && st.days[todayStr()]);
   const thirdName = plate.meal3 === 'steak' ? 'Steak plate' : 'Protein bowl';
   const protein = FOOD.proteins[plate.proteinId];
   const carb = FOOD.carbs[plate.carb];
@@ -740,11 +790,17 @@ function renderMeals(st) {
   const salmonNote = plate.proteinId === 'salmon'
     ? 'Salmon is on this plate. No sardines. On plates without salmon, use the omega-3 supplement.'
     : 'No sardines. Salmon is an optional bowl swap, not a weekly quota. Use the omega-3 supplement when salmon is not on the plate.';
-  const day = plate.day;
+  const planned = plannedDayMacros(plate, eatenDay), eaten = eatenDayMacros(plate, eatenDay);
+  const proteinLeft = NUTRITION.protein - eaten.p;
+  const leftLine = proteinLeft >= 0
+    ? `Protein left today: about ${proteinLeft} g of the ${NUTRITION.protein} g target.`
+    : `Protein is about ${Math.abs(proteinLeft)} g over the ${NUTRITION.protein} g target.`;
   return `<div class="card"><h3>1 · Yoghurt bowl</h3>${macroLine(plate.yoghurt)}
       ${choiceSeg('Sweetener', 'sweetener', [{ id: 'maple', name: 'Maple' }, { id: 'honey', name: 'Honey' }], plate.sweetener)}
-      ${portionsHtml(yoghurtItems)}</div>
-    <div class="card"><h3>2 · ${esc(FOOD.egg.name)}</h3>${macroLine(plate.egg)}${portionsHtml(FOOD.egg.items)}</div>
+      ${portionsHtml(yoghurtItems)}
+      ${eatenToggle('meal', 'yoghurt', eatenDay.meals.yoghurt)}</div>
+    <div class="card"><h3>2 · ${esc(FOOD.egg.name)}</h3>${macroLine(plate.egg)}${portionsHtml(FOOD.egg.items)}
+      ${eatenToggle('meal', 'egg', eatenDay.meals.egg)}</div>
     <div class="card"><h3>3 · ${esc(thirdName)}</h3>
       ${macroLine(plate.third)}
       ${choiceSeg('Third meal', 'meal3', [{ id: 'bowl', name: 'Protein bowl' }, { id: 'steak', name: 'Steak plate' }], plate.meal3)}
@@ -752,17 +808,18 @@ function renderMeals(st) {
       ${choiceSeg('Carb base', 'carb', [{ id: 'rice', name: 'Rice' }, { id: 'sweet', name: 'Sweet potato' }], plate.carb)}
       ${portionsHtml(thirdItems)}
       <div class="note">${esc(salmonNote)}</div>
+      ${eatenToggle('meal', 'third', eatenDay.meals.third)}
     </div>
-    ${renderSnacks(plate)}
-    <div class="card"><b>Day total</b>
-      <div class="muted small" style="margin-top:4px">Three meals plus the snacks that are on. Each line is already rounded. Snacks: ${plate.snack.picked.length ? esc(plate.snack.picked.map(x => x.short).join(' · ')) : 'none'}.</div>
-      <div class="grid4" style="margin-top:8px">
-        <div class="stat"><b>~${comma(day.kcal)}</b><span>kcal</span></div>
-        <div class="stat"><b>${day.p}</b><span>g protein</span></div>
-        <div class="stat"><b>${day.c}</b><span>g carbs</span></div>
-        <div class="stat"><b>${day.f}</b><span>g fat</span></div>
-      </div>
-      <div class="muted small" style="margin-top:10px">Target board: ${NUTRITION.kcal} kcal and ${NUTRITION.protein} g protein, until body measurements are set.</div>
+    ${renderSnacks(plate, eatenDay)}
+    ${renderCustomFoods(eatenDay)}
+    <div class="card"><b>Today</b>
+      <div class="muted small" style="margin-top:4px">Eaten against planned. Tick a meal or snack once you've had it. Snacks on: ${plate.snack.picked.length ? esc(plate.snack.picked.map(x => x.short).join(' · ')) : 'none'}.</div>
+      <div class="picklabel">Eaten</div>
+      ${macroStats(eaten)}
+      <div class="picklabel">Planned</div>
+      ${macroStats(planned)}
+      <div class="muted small" style="margin-top:10px">${esc(leftLine)} Target board: ${NUTRITION.kcal} kcal, until body measurements are set.</div>
+      ${eatenDay.custom.length ? '<div class="muted small">Added foods are in these calorie totals only, not the micronutrient estimates.</div>' : ''}
     </div>
     ${microHtml(plate)}
     <div class="card"><b>How to eat this</b><ul class="bul small">${FOOD.rules.map(r => `<li>${esc(r)}</li>`).join('')}</ul></div>`;
@@ -773,6 +830,7 @@ function renderFood(arg) {
   view().innerHTML = `<div class="row between"><h1 style="margin:0">Food</h1><span class="muted small">Locked ${esc(FOOD.locked)}</span></div>
     <div class="muted small" style="margin-top:4px">${esc(FOOD.board)}</div>
     <div class="muted small">${esc(FOOD.estimate)}</div>
+    ${mode === 'meals' ? askBarHtml(true) : ''}
     ${foodSeg(mode)}
     ${mode === 'shop' ? renderShop() : renderMeals(st)}`;
 }
@@ -820,6 +878,16 @@ function renderSettings() {
     <div class="muted small" style="margin-top:8px">Now: ${esc(weekLine(bi))} · ${PHASES[bi.phase].name}</div></div>
   <div class="card">
     <label class="toggle"><span><b>Deload week</b><br><span class="muted small">Half the sets, same weights or 10% lighter. Turn off when you're back to normal.</span></span><input type="checkbox" id="set-deload" ${settings.deload ? 'checked' : ''}></label></div>
+  <div class="card"><b>Ask AI</b>
+    <div class="muted small" style="margin:4px 0 8px">Optional. Say what you ate from Home, or ask what's left today. ${geminiKey() ? 'A Gemini key is saved on this phone.' : 'No key saved yet.'}</div>
+    <input id="set-key" class="keyin" type="password" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="${geminiKey() ? 'Paste a new key to replace it' : 'Paste your Gemini API key'}">
+    <div class="grid2" style="margin-top:8px">
+      <button type="button" class="btn small" data-act="gemini-save" data-for="set-key">Save key</button>
+      <button type="button" class="btn small ghost" data-act="gemini-clear">Remove key</button>
+    </div>
+    <label class="toggle" style="margin-top:8px"><span><b>Read replies aloud</b><br><span class="muted small">Uses the phone's voice. Australian English when that voice is installed.</span></span><input type="checkbox" id="set-speak" ${speakEnabled() ? 'checked' : ''}></label>
+    <div class="muted small" style="margin-top:8px">Get a free key at <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">aistudio.google.com/apikey</a>. What you type or say about food is sent to Google. The key stays on this phone. Training logs are not sent.</div>
+  </div>
   <div class="card"><b>Backup</b><div class="grid2" style="margin-top:10px"><button class="btn ghost" data-act="export">Export JSON</button><button class="btn ghost" data-act="import">Import JSON</button></div>
     <div class="muted small" style="margin-top:8px">${log.length} sets stored on this phone. Import merges with what's here.</div></div>
   <div class="card small muted">Exercise images: <a href="https://github.com/yuhonas/free-exercise-db" target="_blank" rel="noopener">free-exercise-db</a> (public domain). Demo videos: YouTube, credited to each channel. Works offline once installed: Safari → Share → Add to Home Screen.</div>`;
@@ -854,6 +922,267 @@ function importLog() {
   inp.click();
 }
 
+/* ---------- ask AI ---------- */
+let aiChat = load(LS.aiChat, []);
+if (!Array.isArray(aiChat)) aiChat = [];
+let aiRec = null, aiRecGen = 0, aiListening = false, aiSendOnEnd = false, aiBusy = false, aiPendingListen = false, aiSendTimer = null;
+
+function speechSupported() {
+  return !!(window.SpeechRecognition || window.webkitSpeechRecognition);
+}
+function speakEnabled() { return !!load(LS.aiSpeak, false); }
+function geminiKey() {
+  const k = load(LS.gemini, '');
+  return typeof k === 'string' ? k.trim() : '';
+}
+function saveGeminiKey(raw) {
+  const key = String(raw == null ? '' : raw).trim();
+  if (key.length < 20 || key.length > 200 || /\s/.test(key)) return false;
+  save(LS.gemini, key);
+  return true;
+}
+function clearGeminiKey() { localStorage.removeItem(LS.gemini); }
+function pushAi(msg) {
+  aiChat.push(msg);
+  if (aiChat.length > 30) aiChat = aiChat.slice(-30);
+  save(LS.aiChat, aiChat);
+}
+function paintMic() {
+  const b = $('#ask-mic'), live = $('#ask-live');
+  if (b) {
+    b.classList.toggle('on', aiListening);
+    b.textContent = aiListening ? 'Listening… tap to send' : (speechSupported() ? '🎤 Speak' : '🎤 Type');
+  }
+  if (live) live.classList.toggle('hidden', !aiListening);
+}
+function renderAskLog() {
+  const log = $('#ask-log');
+  if (!log) return;
+  const undo = load(LS.aiUndo, null);
+  const msgs = aiChat.map(m => {
+    const changes = m.changes && m.changes.length ? `<div class="ask-changes">${m.changes.map(esc).join('<br>')}</div>` : '';
+    const skipped = m.skipped && m.skipped.length ? `<div class="muted small">${m.skipped.map(esc).join('<br>')}</div>` : '';
+    return `<div class="ask-msg ${m.role === 'user' ? 'user' : 'model'}${m.warn ? ' warn' : ''}">${esc(m.text)}${changes}${skipped}</div>`;
+  }).join('');
+  const undoHtml = undo && undo.summary
+    ? `<div class="note">${esc(undo.summary)}<button type="button" class="btn small ghost" style="margin-top:8px" data-act="ask-undo">Undo</button></div>`
+    : '';
+  const hasKey = !!geminiKey();
+  const keyHtml = hasKey
+    ? `<div class="muted small">Gemini key saved on this phone. <button type="button" class="linkbtn" data-act="gemini-clear">Remove key</button></div>`
+    : `<div class="card" style="margin:0 0 10px"><b>Gemini key</b>
+        <div class="muted small" style="margin:4px 0 8px">Paste a free key to use Ask AI. It stays on this phone and is only sent to Google.</div>
+        <input id="ask-key" class="keyin" type="password" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="Paste your Gemini API key">
+        <button type="button" class="btn small" style="margin-top:8px" data-act="gemini-save" data-for="ask-key">Save key</button>
+      </div>`;
+  const empty = aiChat.length ? '' : `<div class="muted small" style="margin:8px 0">Say what you ate, or ask how much protein is left. Target is ${NUTRITION.protein} g protein and ${comma(NUTRITION.kcal)} kcal.</div>`;
+  log.innerHTML = `${keyHtml}
+    <label class="toggle"><span><b>Read replies aloud</b><br><span class="muted small">Short replies. Australian English when the phone has that voice.</span></span>
+      <input type="checkbox" id="ask-speak" ${speakEnabled() ? 'checked' : ''}></label>
+    ${undoHtml}${empty}${msgs}`;
+  log.scrollTop = log.scrollHeight;
+}
+function openAsk() {
+  $('#ask').classList.remove('hidden');
+  document.body.classList.add('ask-on');
+  renderAskLog();
+  paintMic();
+  if (!geminiKey()) {
+    aiPendingListen = speechSupported();
+    const input = $('#ask-key');
+    if (input) input.focus();
+    return;
+  }
+  if (speechSupported()) startListen();
+  else { const input = $('#ask-input'); if (input) input.focus(); }
+}
+function closeAsk() {
+  aiPendingListen = false;
+  stopListen(false);
+  $('#ask').classList.add('hidden');
+  document.body.classList.remove('ask-on');
+  if (window.speechSynthesis) { try { speechSynthesis.cancel(); } catch (e) {} }
+}
+function startListen() {
+  const Ctor = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!Ctor || aiBusy) {
+    const input = $('#ask-input');
+    if (input) input.focus();
+    if (!Ctor) {
+      pushAi({ role: 'model', text: 'This browser has no speech recognition. Type instead, or use the mic on the keyboard.', at: Date.now(), local: true, warn: true });
+      renderAskLog();
+    }
+    return;
+  }
+  if (aiRec) { aiSendOnEnd = false; try { aiRec.abort(); } catch (e) {} }
+  const gen = ++aiRecGen;
+  aiRec = new Ctor();
+  aiRec.lang = 'en-AU';
+  aiRec.interimResults = true;
+  aiRec.continuous = false;
+  aiRec.maxAlternatives = 1;
+  aiSendOnEnd = true;
+  aiListening = true;
+  const live = $('#ask-live');
+  if (live) { live.textContent = 'Listening…'; live.classList.remove('hidden'); }
+  const input = $('#ask-input');
+  if (input) input.value = '';
+  paintMic();
+  aiRec.onresult = ev => {
+    if (gen !== aiRecGen) return;
+    let text = '';
+    for (let i = 0; i < ev.results.length; i++) text += ev.results[i][0].transcript;
+    text = text.trim();
+    if (input) input.value = text;
+    if (live) live.textContent = text || 'Listening…';
+  };
+  aiRec.onerror = ev => {
+    if (gen !== aiRecGen) return;
+    aiSendOnEnd = false;
+    const code = ev && ev.error;
+    if (!code || code === 'aborted') return;
+    aiListening = false;
+    paintMic();
+    let msg = 'Mic didn\'t start. Type instead, or use the mic on the keyboard.';
+    if (code === 'not-allowed' || code === 'service-not-allowed') msg = 'Mic is blocked. Type instead, or allow the microphone.';
+    else if (code === 'network') msg = 'Speech needs internet. Type instead, or use the mic on the keyboard.';
+    else if (code === 'no-speech') msg = 'Didn\'t catch that. Tap Speak and try again.';
+    pushAi({ role: 'model', text: msg, at: Date.now(), local: true, warn: true });
+    renderAskLog();
+  };
+  aiRec.onend = () => {
+    if (gen !== aiRecGen) return;
+    const send = aiSendOnEnd;
+    aiListening = false;
+    aiSendOnEnd = false;
+    paintMic();
+    if (!send) return;
+    const text = ((input && input.value) || '').trim();
+    if (!text) return;
+    clearTimeout(aiSendTimer);
+    aiSendTimer = setTimeout(() => sendAsk(text), 350);
+  };
+  try { aiRec.start(); }
+  catch (e) {
+    aiListening = false;
+    aiSendOnEnd = false;
+    paintMic();
+    pushAi({ role: 'model', text: 'Mic didn\'t start. Type instead, or use the mic on the keyboard.', at: Date.now(), local: true, warn: true });
+    renderAskLog();
+  }
+}
+function stopListen(send) {
+  clearTimeout(aiSendTimer);
+  if (!aiRec || !aiListening) { aiListening = false; aiSendOnEnd = false; paintMic(); return; }
+  aiSendOnEnd = !!send;
+  aiListening = false;
+  try { if (send) aiRec.stop(); else aiRec.abort(); } catch (e) {}
+  paintMic();
+}
+function speakReply(text) {
+  if (!speakEnabled() || !window.speechSynthesis || !text) return;
+  try {
+    const u = new SpeechSynthesisUtterance(text);
+    u.lang = 'en-AU';
+    const voices = speechSynthesis.getVoices();
+    const au = voices.filter(v => /en-AU/i.test(v.lang))[0];
+    if (au) u.voice = au;
+    speechSynthesis.cancel();
+    speechSynthesis.speak(u);
+  } catch (e) {}
+}
+function refreshFoodViews() {
+  const h = location.hash.replace(/^#\/?/, '') || 'home';
+  const [p, arg] = h.split('/');
+  const y = scrollY;
+  if (p === 'food') renderFood(arg || '');
+  else if (p === 'home' || p === '') renderHome();
+  scrollTo(0, y);
+}
+function undoAi() {
+  const snap = load(LS.aiUndo, null);
+  if (!snap || !snap.before) { toast('Nothing to undo'); return; }
+  const st = foodState();
+  st.picks = snap.before.picks;
+  st.snacks = snap.before.snacks;
+  if (snap.before.day) st.days[snap.date] = snap.before.day;
+  else delete st.days[snap.date];
+  saveFood(st);
+  localStorage.removeItem(LS.aiUndo);
+  toast('Undone');
+  refreshFoodViews();
+  renderAskLog();
+}
+async function sendAsk(text) {
+  text = String(text || '').trim();
+  if (!text || aiBusy) return;
+  clearTimeout(aiSendTimer);
+  if (!geminiKey()) {
+    const input = $('#ask-input');
+    if (input) input.value = text;
+    pushAi({ role: 'model', text: 'Add your free Gemini key first. It stays on this phone.', at: Date.now(), local: true, warn: true });
+    renderAskLog();
+    const k = $('#ask-key');
+    if (k) k.focus();
+    return;
+  }
+  const input = $('#ask-input');
+  if (input) input.value = '';
+  const live = $('#ask-live');
+  if (live) live.textContent = '';
+  if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+    pushAi({ role: 'user', text, at: Date.now() });
+    pushAi({ role: 'model', text: 'Ask AI needs internet.', at: Date.now(), local: true, warn: true });
+    renderAskLog();
+    return;
+  }
+  aiBusy = true;
+  const sendBtn = $('#ask-send'), micBtn = $('#ask-mic');
+  if (sendBtn) sendBtn.disabled = true;
+  if (micBtn) micBtn.disabled = true;
+  pushAi({ role: 'user', text, at: Date.now() });
+  renderAskLog();
+  const prior = aiChat.slice(0, -1);
+  try {
+    const body = geminiRequestBody(foodState(), todayStr(), prior, text);
+    const res = await fetch(GEMINI_URL, {
+      method: 'POST',
+      cache: 'no-store',
+      headers: { 'Content-Type': 'application/json', 'x-goog-api-key': geminiKey() },
+      body: JSON.stringify(body)
+    });
+    let data = null;
+    try { data = await res.json(); } catch (e) { data = null; }
+    if (!res.ok) throw Object.assign(new Error('api'), { code: res.status });
+    const parsed = parseGeminiFood(data);
+    const applied = applyFoodActions(foodState(), parsed.actions, todayStr());
+    if (applied.changed) {
+      const st = foodState();
+      save(LS.aiUndo, {
+        date: todayStr(),
+        summary: applied.changes.join('. '),
+        before: { picks: st.picks, snacks: st.snacks, day: normaliseFoodDay(st.days && st.days[todayStr()]) }
+      });
+      saveFood(applied.state);
+      refreshFoodViews();
+    }
+    const reply = parsed.reply || (applied.changes.length ? 'Updated today\'s food.' : 'No change.');
+    pushAi({ role: 'model', text: reply, at: Date.now(), changes: applied.changes, skipped: applied.skipped });
+    renderAskLog();
+    speakReply(reply);
+  } catch (err) {
+    const offline = navigator.onLine === false || (err && err.name === 'TypeError');
+    const msg = offline ? geminiErrorText(0, false) : geminiErrorText(Number(err && err.code) || 0, true);
+    pushAi({ role: 'model', text: msg, at: Date.now(), local: true, warn: true });
+    renderAskLog();
+  } finally {
+    aiBusy = false;
+    if (sendBtn) sendBtn.disabled = false;
+    if (micBtn) micBtn.disabled = false;
+    paintMic();
+  }
+}
+
 /* ---------- events ---------- */
 document.addEventListener('input', e => {
   const t = e.target; if (!t.dataset || !t.dataset.f) return;
@@ -872,6 +1201,30 @@ document.addEventListener('change', e => {
     if (lab) lab.classList.toggle('on', e.target.checked);
     const { total, done } = shopStats(st.checks);
     const n = $('#shop-count'); if (n) n.textContent = `${done} of ${total} ticked`;
+  }
+  if (e.target.id === 'ask-speak' || e.target.id === 'set-speak') {
+    save(LS.aiSpeak, !!e.target.checked);
+    if (!e.target.checked && window.speechSynthesis) { try { speechSynthesis.cancel(); } catch (err) {} }
+  }
+  if (e.target.dataset && e.target.dataset.eaten) {
+    const st = foodState(), date = todayStr();
+    const day = normaliseFoodDay(st.days && st.days[date]);
+    const kind = e.target.dataset.eaten, id = e.target.dataset.id, on = e.target.checked;
+    if (kind === 'meal' && MEAL_IDS.indexOf(id) !== -1) day.meals[id] = on;
+    else if (kind === 'snack' && FOOD.snackById[id]) {
+      if (on) {
+        day.snacks[id] = true;
+        const sel = Object.assign({}, snackState(st.snacks).sel);
+        if (!sel[id]) { sel[id] = FOOD.snackById[id].defaultPortion; st.snacks = snacksToStore(sel); }
+      } else delete day.snacks[id];
+    } else if (kind === 'custom') {
+      const item = day.custom.find(c => c.id === id);
+      if (!item) return;
+      item.eaten = on;
+    } else return;
+    st.days[date] = day;
+    saveFood(st);
+    const y = scrollY; renderFood(foodArg()); scrollTo(0, y);
   }
 });
 document.addEventListener('click', e => {
@@ -925,6 +1278,10 @@ document.addEventListener('click', e => {
       sel[item.id] = sel[item.id] === v && b.dataset.off ? null : v;
     }
     st.snacks = snacksToStore(sel);
+    if (!sel[item.id] && st.days && st.days[todayStr()]) {
+      const day = normaliseFoodDay(st.days[todayStr()]);
+      if (day.snacks[item.id]) { delete day.snacks[item.id]; st.days[todayStr()] = day; }
+    }
     saveFood(st);
     const y = scrollY; renderFood(foodArg()); scrollTo(0, y);
   } else if (act === 'shop-reset') {
@@ -932,10 +1289,68 @@ document.addEventListener('click', e => {
     if (!Object.keys(st.checks).length) { toast('Nothing to clear'); return; }
     if (!confirm('Clear every tick for a new week?')) return;
     st.checks = {}; saveFood(st); renderFood('shop'); scrollTo(0, 0); toast('Shopping list cleared');
+  } else if (act === 'custom-del') {
+    const st = foodState(), date = todayStr();
+    const day = normaliseFoodDay(st.days && st.days[date]);
+    const next = day.custom.filter(c => c.id !== b.dataset.id);
+    if (next.length === day.custom.length) return;
+    day.custom = next;
+    st.days[date] = day;
+    saveFood(st);
+    const y = scrollY; renderFood(foodArg()); scrollTo(0, y); toast('Removed');
+  } else if (act === 'ask-open') {
+    if ($('#ask').classList.contains('hidden')) openAsk();
+    else if (geminiKey() && speechSupported()) startListen();
+  } else if (act === 'ask-close') closeAsk();
+  else if (act === 'ask-clear') {
+    if (!aiChat.length) { toast('Nothing to clear'); return; }
+    if (!confirm('Clear this chat? Food ticks stay.')) return;
+    aiChat = []; save(LS.aiChat, aiChat); renderAskLog();
+  } else if (act === 'ask-undo') undoAi();
+  else if (act === 'ask-mic') {
+    if (!speechSupported()) {
+      const input = $('#ask-input');
+      if (input) input.focus();
+      pushAi({ role: 'model', text: 'This browser has no speech recognition. Type instead, or use the mic on the keyboard.', at: Date.now(), local: true, warn: true });
+      renderAskLog();
+    } else if (aiListening) stopListen(true);
+    else startListen();
+  } else if (act === 'gemini-save') {
+    const field = document.getElementById(b.dataset.for || '');
+    if (!field || !saveGeminiKey(field.value)) { toast('Paste the full key from AI Studio'); return; }
+    field.value = '';
+    toast('Key saved on this phone');
+    if ((location.hash || '').indexOf('settings') !== -1) renderSettings();
+    if (!$('#ask').classList.contains('hidden')) {
+      renderAskLog();
+      if (aiPendingListen) { aiPendingListen = false; startListen(); }
+    }
+  } else if (act === 'gemini-clear') {
+    if (!geminiKey()) { toast('No key saved'); return; }
+    if (!confirm('Remove the Gemini key from this phone?')) return;
+    clearGeminiKey();
+    toast('Key removed');
+    if ((location.hash || '').indexOf('settings') !== -1) renderSettings();
+    if (!$('#ask').classList.contains('hidden')) renderAskLog();
   } else if (act === 'export') exportLog();
   else if (act === 'import') importLog();
   else if (act === 'finish') { const n = log.filter(x => x.d === todayStr()).length; toast(n ? `Session saved: ${n} sets. Be better, not perfect.` : 'No sets ticked today'); }
 });
+document.addEventListener('submit', e => {
+  if (e.target.id !== 'ask-form') return;
+  e.preventDefault();
+  if (aiListening) stopListen(false);
+  sendAsk($('#ask-input').value);
+});
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape' && !$('#ask').classList.contains('hidden')) { closeAsk(); return; }
+  if (e.key === 'Enter' && e.target.id === 'ask-input' && !e.shiftKey) {
+    e.preventDefault();
+    if (aiListening) stopListen(false);
+    sendAsk(e.target.value);
+  }
+});
+$('#ask').addEventListener('click', e => { if (e.target.id === 'ask') closeAsk(); });
 
 /* ---------- router ---------- */
 function go(h) { location.hash = h; }

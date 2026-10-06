@@ -9,5 +9,5 @@ with tempo cues, a HIIT menu with interval timers, a guided daily mobility sessi
 - Demo videos: embedded YouTube (youtube-nocookie) demos from their original channels, loaded only when you tap play (needs internet)
 - `img/`: offline still images from [free-exercise-db](https://github.com/yuhonas/free-exercise-db) (public domain, see `img/LICENSE-free-exercise-db.md`)
 
-Training logs are stored only in the phone's localStorage. Nothing is uploaded.
+Training logs and food ticks stay in the phone's localStorage. Ask AI is optional: a Gemini key saved in Settings stays on the phone, and what you type or say about food is sent to Google. Nothing else is uploaded.
 On iPhone: open in Safari → Share → Add to Home Screen, then always launch from the icon.
