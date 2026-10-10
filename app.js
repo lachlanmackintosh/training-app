@@ -9,25 +9,16 @@ const load = (k, d) => { try { const v = JSON.parse(localStorage.getItem(k)); re
 const save = (k, v) => localStorage.setItem(k, JSON.stringify(v));
 const comma = n => String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
 function foodState() {
-  const v = load(LS.food, null);
-  const old = v ? null : load('lockie.food.v1', {});
-  const src = (v && typeof v === 'object' ? v : old) || {};
-  const from = src.picks && typeof src.picks === 'object' ? src.picks : {};
-  const checksSrc = src.checks && typeof src.checks === 'object' && !Array.isArray(src.checks) ? src.checks : {};
-  const proteinOk = { mince: 1, thigh: 1, salmon: 1, venison: 1, bison: 1 };
-  const picks = {
-    sweetener: from.sweetener === 'honey' ? 'honey' : 'maple',
-    meal3: from.meal3 === 'steak' ? 'steak' : 'bowl',
-    protein: proteinOk[from.protein] ? from.protein : 'mince',
-    carb: (from.carb || src.carb) === 'sweet' ? 'sweet' : 'rice'
-  };
-  const snacks = src.snacks && typeof src.snacks === 'object' && !Array.isArray(src.snacks) ? src.snacks : null;
-  const daysIn = src.days && typeof src.days === 'object' && !Array.isArray(src.days) ? src.days : {};
-  const days = {};
-  for (const k of Object.keys(daysIn)) {
-    if (/^\d{4}-\d{2}-\d{2}$/.test(k)) days[k] = normaliseFoodDay(daysIn[k]);
+  let stored = load(LS.food, null);
+  if (!stored) stored = load('lockie.food.v1', null);
+  const st = loadFoodState(stored || {});
+  if (!stored || stored.v !== 4) {
+    try {
+      if (stored && !localStorage.getItem('lockie.food.v2.bak')) localStorage.setItem('lockie.food.v2.bak', JSON.stringify(stored));
+    } catch (e) { /* storage full or blocked */ }
+    saveFood(st);
   }
-  return { picks, snacks, checks: checksSrc, days };
+  return st;
 }
 function foodDayCutoff() {
   const d = today();
@@ -36,13 +27,12 @@ function foodDayCutoff() {
 }
 function saveFood(st) {
   const min = foodDayCutoff();
+  const picks = normalisePicks(st && st.picks);
   const days = {};
-  for (const k of Object.keys(st.days || {})) {
-    if (/^\d{4}-\d{2}-\d{2}$/.test(k) && k >= min) days[k] = normaliseFoodDay(st.days[k]);
+  for (const k of Object.keys((st && st.days) || {})) {
+    if (/^\d{4}-\d{2}-\d{2}$/.test(k) && k >= min) days[k] = normaliseFoodDay(st.days[k], picks);
   }
-  const payload = { picks: st.picks, checks: st.checks || {}, days };
-  if (st.snacks) payload.snacks = st.snacks;
-  save(LS.food, payload);
+  save(LS.food, { v: 4, picks, checks: (st && st.checks) || {}, days });
 }
 
 let settings = Object.assign({}, DEFAULT_SETTINGS, load(LS.settings, {}));
@@ -245,18 +235,13 @@ function renderHome() {
   }
   const mk = mobKeyFor(d), mo = MOBILITY[mk];
   const n = NUTRITION;
-  const food = foodState(), plate = foodPlate(food.picks, food.snacks);
-  const eatenDay = normaliseFoodDay(food.days[ds]);
-  const planned = plannedDayMacros(plate, eatenDay), eaten = eatenDayMacros(plate, eatenDay);
-  const thirdName = plate.meal3 === 'steak' ? 'Steak plate' : 'Protein bowl';
-  const swapLine = [
-    FOOD.sweeteners[plate.sweetener].name,
-    FOOD.proteins[plate.proteinId].short,
-    FOOD.carbs[plate.carb].name
-  ].join(' · ');
-  const eatenLine = (eaten.kcal || eaten.p)
-    ? `Eaten ~${comma(eaten.kcal)} kcal · ${eaten.p} g protein. `
-    : 'Nothing ticked as eaten yet. ';
+  const food = foodState();
+  const dash = dayReport(food, ds);
+  const lowNames = dash.lows.slice(0, 3).map(x => x.name);
+  const foodTitle = dash.hasLog ? `${comma(Math.round(dash.macros.kcal))} / ${comma(dash.targets.kcal)} kcal` : 'Nothing logged yet';
+  const foodSub = dash.hasLog
+    ? `${Math.round(dash.macros.p)} / ${dash.targets.protein} g protein${lowNames.length ? ' · Low: ' + lowNames.join(', ') : ' · Food targets covered'}`
+    : 'Tick a meal, or tell Ask AI what you ate.';
   view().innerHTML = `
   <div class="row between"><div><div class="muted small">${esc(fmtLong(d))}</div><h1 class="apph">${esc(APP_HEADING)}</h1></div>
     <a class="iconbtn" href="#/settings" aria-label="Settings"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"><path d="M4 8h16M4 16h16"/><circle cx="9" cy="8" r="2.25"/><circle cx="15" cy="16" r="2.25"/></svg></a></div>
@@ -268,11 +253,10 @@ function renderHome() {
     <div class="cardtitle">${esc(mo.name)}</div>
     <div class="muted small">${esc(mo.moves.slice(0, 4).map(x => x[0]).join(' · '))} …</div>
     <a class="btn ghost" style="margin-top:10px" href="#/mobility/${mk}">Start mobility</a></div>
-  <div class="card foodcard"><div class="row between wrap"><b class="kicker">Today's meals</b><span class="muted small">${esc(swapLine)}</span></div>
-    <div class="cardtitle">Yoghurt bowl · Egg meal · ${esc(thirdName)}</div>
-    <div class="muted small">${eatenLine}Planned ~${comma(planned.kcal)} kcal · ${planned.p} g protein. Target board is still 2,500 kcal and 175 g protein.</div>
-    ${plate.snack.custom ? `<div class="muted small">Snacks: ${esc(plate.snack.picked.length ? plate.snack.picked.map(x => x.short).join(' · ') : 'none')}</div>` : ''}
-    <a class="btn ghost" style="margin-top:10px" href="#/food">Open meals</a>
+  <div class="card foodcard"><div class="row between"><b class="kicker">Today's food</b>${dash.hasLog ? `<span class="muted small">${dash.macroBars[1].pct}% protein</span>` : ''}</div>
+    <div class="cardtitle">${esc(foodTitle)}</div>
+    <div class="muted small">${esc(foodSub)}</div>
+    <a class="btn ghost" style="margin-top:10px" href="#/food">Open food</a>
     <a class="textlink" href="#/food/shop">Shopping list</a></div>
   <div class="card"><div class="row between"><b class="kicker">Daily targets</b><span class="muted small">every day</span></div>
     <div class="grid4" style="margin-top:10px">
@@ -612,43 +596,10 @@ function renderHistory(m) {
 }
 
 /* ---------- food ---------- */
-function macroLine(m) {
-  return `<div class="macros"><b>~${comma(m.kcal)} kcal</b><span>${m.p} g protein · ${m.c} g carbs · ${m.f} g fat</span></div>`;
-}
-function eatenToggle(kind, id, on) {
-  return `<label class="todaytick"><input type="checkbox" data-eaten="${esc(kind)}" data-id="${esc(id)}"${on ? ' checked' : ''}><span>Eaten today</span></label>`;
-}
 function askBarHtml(slim) {
   const hint = speechSupported() ? 'Tap to dictate, then send' : 'Tap to type, or use the mic on your keyboard';
   const mic = '<svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path fill="currentColor" d="M12 14a3 3 0 0 0 3-3V6a3 3 0 0 0-6 0v5a3 3 0 0 0 3 3Zm-7-3a1 1 0 1 0-2 0 9 9 0 0 0 8 8.94V22h2v-2.06A9 9 0 0 0 21 11a1 1 0 1 0-2 0 7 7 0 0 1-14 0Z"/></svg>';
   return `<button type="button" class="askbar${slim ? ' slim' : ''}" data-act="ask-open"><span class="askbar-mic" aria-hidden="true">${mic}</span><span class="askbar-copy"><b>Ask AI</b><span>${esc(hint)}</span></span></button>`;
-}
-function macroStats(m) {
-  return `<div class="grid4" style="margin-top:8px">
-    <div class="stat"><b>~${comma(m.kcal)}</b><span>kcal</span></div>
-    <div class="stat"><b>${m.p}</b><span>g protein</span></div>
-    <div class="stat"><b>${m.c}</b><span>g carbs</span></div>
-    <div class="stat"><b>${m.f}</b><span>g fat</span></div>
-  </div>`;
-}
-function portionsHtml(items) {
-  return `<ul class="portions">${items.map(it => {
-    const cls = [it.optional ? 'opt' : '', it.picked ? 'picked' : ''].filter(Boolean).join(' ');
-    return `<li class="${cls}">${it.optional ? 'Optional, uncounted: ' : ''}${esc(it.text)}</li>`;
-  }).join('')}</ul>`;
-}
-function choiceSeg(aria, key, options, current) {
-  return `<div class="picklabel">${esc(aria)}</div><div class="seg foodpick" role="group" aria-label="${esc(aria)}">${options.map(o => {
-    const on = o.id === current;
-    return `<button type="button" class="${on ? 'on' : ''}" data-act="food-pick" data-k="${esc(key)}" data-v="${esc(o.id)}" aria-pressed="${on ? 'true' : 'false'}">${esc(o.name)}</button>`;
-  }).join('')}</div>`;
-}
-function proteinPicks(current) {
-  const ids = ['mince', 'thigh', 'salmon', 'venison', 'bison'];
-  return `<div class="pick" role="group" aria-label="Protein">${ids.map(id => {
-    const o = FOOD.proteins[id], on = id === current;
-    return `<button type="button" class="pickrow${on ? ' on' : ''}" data-act="food-pick" data-k="protein" data-v="${id}" aria-pressed="${on ? 'true' : 'false'}"><span>${esc(o.name)}</span><span class="muted small">${esc(o.portion)}</span></button>`;
-  }).join('')}</div>`;
 }
 function foodSeg(mode) {
   return `<div class="seg foodseg">
@@ -671,176 +622,126 @@ function renderShop() {
     return `<div class="group-h">${esc(g.title)}</div><div class="card" style="margin-top:4px">${g.note ? `<div class="muted small">${esc(g.note)}</div>` : ''}${items}</div>`;
   }).join('');
   return `<div class="row between" style="margin-top:14px"><div><b id="shop-count">${done} of ${total} ticked</b>
-      <div class="muted small">Buy the calculated base first. Snacks and swaps are listed on their own and are not extra food unless you buy them.</div></div></div>
+      <div class="muted small">The week's food. Swaps replace a default. They are not extra food.</div></div></div>
     <button class="btn ghost" style="margin-top:10px" data-act="shop-reset">Reset for new week</button>
     ${groups}`;
 }
-function near(n, step) { return Math.round(n / step) * step; }
-function microNow(plate) {
-  const b = FOOD.micros.base[plate.carb], a = FOOD.micros.avocado, d = FOOD.micros.protein[plate.proteinId];
-  const s = plate.snack.micro;
-  return {
-    e0: b.e[0] + a.e + s.e, e1: b.e[1] + a.e + s.e,
-    mg: near(b.mg + a.mg + s.mg, 10),
-    fibre: b.fibre + a.fibre + s.fibre,
-    iron: b.iron + d.iron + s.iron,
-    zinc: b.zinc + d.zinc + s.zinc,
-    b12: b.b12 + d.b12 + s.b12,
-    a: b.a + s.a,
-    k: near(b.k + a.k + s.k, 100),
-    folate: near(b.folate + a.folate + s.folate, 50),
-    iodine: b.iodine + s.iodine
-  };
+function trackBar(pct, hit) {
+  const w = Math.max(0, Math.min(100, Number(pct) || 0));
+  return `<div class="track${hit ? ' hit' : ''}" role="img" aria-label="${w} percent"><i style="width:${w}%"></i></div>`;
 }
-function microHtml(plate) {
-  const m = FOOD.micros, now = microNow(plate), salmon = plate.proteinId === 'salmon';
-  const rows = m.rows.map(r => {
-    const warn = r[4].indexOf('Gap') === 0 || r[2] === 'Unresolved' || r[3] === 'Unresolved';
-    return `<div class="micron"><div class="row between"><b>${esc(r[0])}</b><span class="small ${warn ? 'gap' : 'muted'}">${esc(r[4])}</span></div>
-      <div class="muted small">Guide ${esc(r[1])} · Rice ${esc(r[2])} · Sweet potato ${esc(r[3])}</div></div>`;
+function dashHtml(st) {
+  const d = dayReport(st, todayStr());
+  const macros = d.macroBars.map(b => {
+    const val = b.key === 'kcal' ? comma(Math.round(b.value)) : String(Math.round(b.value));
+    const tgt = b.key === 'kcal' ? comma(b.target) : String(b.target);
+    const unit = b.unit ? ' ' + b.unit : '';
+    return `<div class="mbar"><div class="row between"><span>${esc(b.name)}</span><b>${val}<span class="muted"> / ${tgt}${esc(unit)}</span>${b.hit ? ' <span class="ok">✓</span>' : ''}</b></div>${trackBar(b.pct, b.hit)}</div>`;
   }).join('');
-  const mgShort = 400 - now.mg;
-  const mgLine = mgShort > 10
-    ? `about ${comma(now.mg)} mg. Guide 400 mg, so still short by about ${comma(mgShort)} mg.`
-    : `about ${comma(now.mg)} mg, which meets the 400 mg guide.`;
-  const eRange = now.e0 === now.e1 ? String(now.e0) : `${now.e0}–${now.e1}`;
-  const caf = plate.snack.picked.filter(p => p.tag === 'caffeine');
-  const extraBits = [
-    plate.snack.tags.k2 ? 'Extra cheese is on. It adds some K2, which still is not a number here.' : '',
-    plate.snack.tags.salt ? 'A ferment is on. Count it as salt, roughly a few hundred milligrams of sodium in 50 g, not as a second serving of vegetables.' : '',
-    plate.snack.tags.broth ? 'Bone broth is on. Its sodium and minerals are not in these figures.' : '',
-    !plate.snack.sel.fruit && !plate.snack.sel.oj ? 'Fruit and orange juice are both off, so vitamin C is lower than the handover day. It is not given a new total.' : ''
-  ].filter(Boolean);
-  return `<details class="card fold"><summary>Micronutrients</summary>
-    <div class="muted small" style="margin-top:4px">For this plate, including the snacks that are on. Estimates against the Sillz guide, not lab results. Figures are rounded so a pick does not look more precise than it is. A default day still has the carrot, gold kiwi and 150 mL juice inside these figures.</div>
-    <div class="chips">${m.covered.map(c => `<span class="chip">${esc(c)}</span>`).join('')}</div>
-    <ul class="bul small">
-      <li><b class="${now.e0 < 15 ? 'gap' : ''}">Vitamin E</b> — about ${eRange} mg, ${now.e0 < 15 ? 'still short of the 15 mg guide' : 'which meets the 15 mg guide on this estimate'}. The extra ½ avocado is in that range.${plate.snack.tags.pollen ? ' Bee pollen is not included.' : ''}</li>
-      <li><b class="${mgShort > 10 ? 'gap' : ''}">Magnesium</b> — ${mgLine} Whey minerals that are not on the label are not included.</li>
-      <li><b>Iron</b> — about ${now.iron} mg. <b>Zinc</b> — about ${now.zinc} mg. <b>B12</b> — about ${now.b12} µg. ${salmon ? 'Salmon is lower in iron and zinc than mince, and a bit higher in B12.' : plate.proteinId === 'thigh' ? 'Chicken thigh is lower in iron, zinc and B12 than mince.' : plate.proteinId === 'venison' ? 'Venison is a bit higher in iron than mince. Zinc and B12 stay close.' : 'Close to the mince plate for these three.'}</li>
-      <li><b>Vitamin D</b> — ${salmon ? 'the salmon portion alone is on the order of 15–25 µg (wild sockeye-style). That is not a full-day assay. The rest of the plate was unresolved.' : 'still unresolved on this plate. Unresolved is not zero.'}</li>
-      <li><b>Omega-3</b> — ${salmon ? 'this plate has salmon, on the order of 1.5–2.5 g long-chain omega-3 from that portion. No sardines.' : 'no salmon on this plate, and no sardines. Use the omega-3 supplement.'}</li>
-      <li><b>Vitamin A</b> — about ${comma(now.a)} µg retinol equivalents. Sweet potato is the jump, not the protein. <b>Fibre</b> — about ${now.fibre} g. <b>Potassium</b> — about ${comma(now.k)} mg. <b>Folate</b> — about ${comma(now.folate)} µg.</li>
-    </ul>
-    <div class="muted small">Iodine is about ${now.iodine} µg and comes mostly from the dairy${plate.snack.tags && (plate.snack.sel.kefir || plate.snack.sel.xmilk) ? ', including the extra dairy on this day. Still a generic dairy estimate' : ''}. B6 and K2 stay unresolved. A blank is not zero intake.</div>
-    ${caf.length ? `<div class="muted small" style="margin-top:6px"><b>Caffeine</b> — ${caf.map(p => `${esc(p.short)} about ${esc(p.caffeine)}`).join('; ')}. A note, not a target.</div>` : ''}
-    ${extraBits.length ? `<ul class="bul small">${extraBits.map(t => `<li>${esc(t)}</li>`).join('')}</ul>` : ''}
-    <details class="micro-more"><summary>Handover table (mince, before the extra avocado)</summary>
-      ${rows}
-      <ul class="bul small">${m.footnotes.map(f => `<li>${esc(f)}</li>`).join('')}</ul>
-    </details></details>`;
-}
-function macroBit(m) {
-  return `~${comma(m.kcal)} kcal · ${m.p} g protein · ${m.c} g carbs · ${m.f} g fat`;
-}
-function snackItemHtml(it, portionId, eaten) {
-  const on = !!portionId;
-  const ids = Object.keys(it.portions);
-  const tick = on ? eatenToggle('snack', it.id, eaten) : '';
-  if (it.choose) {
-    const rows = ids.map(id => {
-      const p = it.portions[id], isOn = id === portionId;
-      return `<button type="button" class="pickrow${isOn ? ' on' : ''}" data-act="snack-portion" data-id="${esc(it.id)}" data-v="${esc(id)}" data-off="1" aria-pressed="${isOn ? 'true' : 'false'}"><span>${esc(p.name)}</span><span class="muted small">${esc(p.label)} · ${macroBit(p.macros)}</span>${p.note ? `<span class="muted small">${esc(p.note)}</span>` : ''}</button>`;
+  const hard = d.hasLog ? d.hard.filter(h => !h.hit).map(h => `<div class="hard"><b>${esc(h.name)} · ${h.pct}%</b><div class="muted small">${esc(h.note)}</div></div>`).join('') : '';
+  const hardBlock = hard ? `<div class="picklabel">Known gaps</div>${hard}` : '';
+  let low = '';
+  if (!d.hasLog) low = '<p class="muted small" style="margin:14px 0 0">Nothing logged yet. Tick a meal, or tell Ask AI what you ate.</p>';
+  else if (d.lows.length) {
+    low = '<div class="picklabel">Low today</div>' + d.lows.map(n => {
+      const sug = n.suggestions.map(s => esc(s.label)).join(' · ');
+      return `<div class="low"><div class="row between"><b>${esc(n.name)}</b><span class="muted">${n.pct}%</span></div>${trackBar(n.pct, false)}${sug ? `<div class="muted small sug">${sug}</div>` : ''}</div>`;
     }).join('');
-    return `<div class="picklabel">${esc(it.name)}</div>${it.note ? `<div class="muted small">${esc(it.note)}</div>` : ''}<div class="pick" role="group" aria-label="${esc(it.name)}">${rows}</div>${tick}`;
+  } else low = '<p class="muted small" style="margin:14px 0 0">Sillz targets you can hit with food are covered.</p>';
+  const all = d.nutrients.map(n => `<div class="nut"><div class="row between"><span>${esc(n.name)}</span><span class="muted">${esc(formatAmount(n.value))} ${esc(n.unit)} · ${n.pct}%${n.hit ? ' <span class="ok">✓</span>' : ''}</span></div>${trackBar(n.pct, n.hit)}</div>`).join('');
+  const est = d.estimate ? '<div class="muted small" style="margin-top:8px">Totals include an estimate.</div>' : '';
+  return `<div class="card dash">${macros}${est}${hardBlock}${low}<details class="fold" data-keep="nuts"><summary>All nutrients</summary>${all}</details></div>`;
+}
+function foodNote(id) {
+  const food = FOOD_PLAN.library[id];
+  return food && food.note ? food.note : '';
+}
+function itemLine(day, meal, it) {
+  const line = day.items.find(x => x.meal === meal.id && x.id === it.id);
+  const name = foodName(it.id);
+  const note = foodNote(it.id);
+  if (isSkipped(day, meal.id, it.id) && !line) {
+    return `<div class="irow"><div class="irow-name"><b>${esc(name)}</b><div class="muted small">Skipped</div></div><button type="button" class="linkbtn" data-act="log-add" data-meal="${esc(meal.id)}" data-id="${esc(it.id)}">Add</button></div>`;
   }
-  const shown = it.portions[portionId] || it.portions[it.defaultPortion];
-  const sub = on ? `${shown.label} · ${macroBit(shown.macros)}` : `Off · ${shown.label} would add ${macroBit(shown.macros)}`;
-  const note = [(on && shown.note) || it.note, shown.caffeine ? `Caffeine about ${shown.caffeine}.` : ''].filter(Boolean).join(' ');
-  const toggle = `<button type="button" class="pickrow snackrow${on ? ' on' : ''}" data-act="snack-toggle" data-id="${esc(it.id)}" aria-pressed="${on ? 'true' : 'false'}"><span>${esc(it.name)}${it.occasional ? ' <span class="badge">Occasional</span>' : ''}</span><span class="muted small">${esc(sub)}</span>${note ? `<span class="muted small">${esc(note)}</span>` : ''}</button>`;
-  if (ids.length < 2) return toggle + tick;
-  const seg = `<div class="seg foodpick snackseg" role="group" aria-label="${esc(it.name)} portion">${ids.map(id => {
-    const p = it.portions[id], isOn = id === portionId;
-    return `<button type="button" class="${isOn ? 'on' : ''}" data-act="snack-portion" data-id="${esc(it.id)}" data-v="${esc(id)}" aria-pressed="${isOn ? 'true' : 'false'}">${esc(p.chip || p.label)}</button>`;
-  }).join('')}</div>`;
-  return toggle + seg + tick;
+  if (!line) {
+    return `<div class="irow"><div class="irow-name"><b>${esc(name)}</b>${note ? `<div class="muted small">${esc(note)}</div>` : ''}</div><span class="muted">${it.g} g</span></div>`;
+  }
+  return `<div class="irow"><div class="irow-name"><b>${esc(name)}</b>${note ? `<div class="muted small">${esc(note)}</div>` : ''}</div>
+    <label class="gramlab"><input class="gram" type="number" inputmode="numeric" min="1" max="2500" step="1" data-grams="${esc(line.uid)}" value="${line.g}" aria-label="${esc(name)} grams"><span>g</span></label>
+    <button type="button" class="linkbtn" data-act="log-del" data-uid="${esc(line.uid)}">Remove</button></div>`;
 }
-function renderSnacks(plate, eatenDay) {
-  const sel = plate.snack.sel;
-  const groups = FOOD.snackGroups.map(g => {
-    const items = FOOD.snackItems.filter(it => it.group === g.id).map(it => snackItemHtml(it, sel[it.id], !!(eatenDay && eatenDay.snacks[it.id]))).join('');
-    return `<details class="fold"><summary>${esc(g.title)}</summary>${g.note ? `<div class="muted small">${esc(g.note)}</div>` : ''}${items}</details>`;
+function swapFields(meal, picks) {
+  const slots = [];
+  for (const it of meal.items) if (it.slot && slots.indexOf(it.slot) === -1) slots.push(it.slot);
+  return slots.map(slot => {
+    const sw = FOOD_PLAN.swaps[slot];
+    const opts = sw.ids.map(id => `<option value="${esc(id)}"${id === picks[slot] ? ' selected' : ''}>${esc(foodName(id))}</option>`).join('');
+    return `<label class="picklabel">${esc(sw.label)}<select class="foodsel" data-swap="${esc(slot)}">${opts}</select></label>`;
   }).join('');
-  return `<div class="card"><h3>Snacks & drinks</h3>
-    ${macroLine(plate.snack.macros)}
-    <div class="muted small" style="margin-top:4px">${esc(FOOD.snackIntro)}</div>
-    ${groups}</div>`;
 }
-function renderCustomFoods(day) {
-  if (!day.custom.length) return '';
-  const rows = day.custom.map(c => `<div class="customfood">
-      <div class="row between"><b>${esc(c.name)}<span class="estimate">Estimate</span></b>
-        <button type="button" class="linkbtn" data-act="custom-del" data-id="${esc(c.id)}">Delete</button></div>
-      <div class="muted small">${macroBit({ kcal: c.kcal, p: c.p, c: c.c, f: c.f })}</div>
-      ${eatenToggle('custom', c.id, c.eaten)}
-    </div>`).join('');
-  return `<div class="card"><h3>Added today</h3>
-    <div class="muted small">Not on the meal plan. Counted in today's totals. Each one is an estimate until you delete it.</div>
-    ${rows}</div>`;
+function mealCard(st, day, meal) {
+  const plan = resolveMeal(meal, st.picks);
+  const state = mealTickState(day, meal, st.picks);
+  const logged = day.items.filter(i => i.meal === meal.id);
+  const basis = logged.length ? logged : plan.items.map(it => ({ id: it.id, g: it.g }));
+  const nut = sumNutrients(basis.map(itemNutrients));
+  const label = logged.length ? 'Logged' : 'Planned';
+  const when = plan.when ? ` <span class="muted">${esc(plan.when)}</span>` : '';
+  const rows = plan.items.map(it => itemLine(day, meal, it)).join('');
+  let mush = '';
+  if (meal.id === 'egg') {
+    const line = day.items.find(i => i.id === 'uv_mushrooms' && i.meal === 'egg');
+    const on = !!line || (st.picks.mushrooms && !isSkipped(day, 'egg', 'uv_mushrooms'));
+    const grams = line
+      ? `<label class="gramlab"><input class="gram" type="number" inputmode="numeric" min="1" max="2500" step="1" data-grams="${esc(line.uid)}" value="${line.g}" aria-label="Mushroom grams"><span>g</span></label>`
+      : '';
+    mush = `<label class="todaytick"><input type="checkbox" data-mush="1"${on ? ' checked' : ''}><span>UV mushrooms <span class="muted">optional</span></span></label>${grams ? `<div class="irow"><div class="irow-name"><span class="muted small">${esc(foodNote('uv_mushrooms') || 'Vitamin D')}</span></div>${grams}</div>` : ''}`;
+  }
+  return `<div class="card"><label class="todaytick"><input type="checkbox" data-meal="${esc(meal.id)}" data-state="${state}"><span><b>${esc(plan.name)}</b>${when}</span></label>
+    <div class="muted small">${label} ${comma(Math.round(nut.kcal))} kcal · ${Math.round(nut.protein_g)} g protein</div>
+    <details class="fold" data-keep="meal-${esc(meal.id)}"><summary>Items and swaps</summary>${rows}${mush}${swapFields(meal, st.picks)}</details></div>`;
+}
+function addedCard(day) {
+  const extra = day.items.filter(i => !i.meal);
+  if (!extra.length) return '';
+  const rows = extra.map(item => {
+    const name = item.estimate ? item.name : foodName(item.id);
+    const badge = item.estimate ? '<span class="estimate">Estimate</span>' : '';
+    if (item.flat) {
+      const kcal = item.tot && item.tot.kcal ? Math.round(item.tot.kcal) : 0;
+      return `<div class="irow"><div class="irow-name"><b>${esc(name)}${badge}</b><div class="muted small">About ${comma(kcal)} kcal</div></div><button type="button" class="linkbtn" data-act="log-del" data-uid="${esc(item.uid)}">Remove</button></div>`;
+    }
+    return `<div class="irow"><div class="irow-name"><b>${esc(name)}${badge}</b></div>
+      <label class="gramlab"><input class="gram" type="number" inputmode="numeric" min="1" max="2500" step="1" data-grams="${esc(item.uid)}" value="${item.g}" aria-label="${esc(name)} grams"><span>g</span></label>
+      <button type="button" class="linkbtn" data-act="log-del" data-uid="${esc(item.uid)}">Remove</button></div>`;
+  }).join('');
+  return `<div class="card"><h3>Added</h3><div class="muted small">Not part of a ticked meal. Estimates are marked.</div>${rows}</div>`;
 }
 function renderMeals(st) {
-  const plate = foodPlate(st.picks, st.snacks);
-  const eatenDay = normaliseFoodDay(st.days && st.days[todayStr()]);
-  const thirdName = plate.meal3 === 'steak' ? 'Steak plate' : 'Protein bowl';
-  const protein = FOOD.proteins[plate.proteinId];
-  const carb = FOOD.carbs[plate.carb];
-  const yoghurtItems = FOOD.yoghurtItems.concat([
-    { text: FOOD.sweeteners[plate.sweetener].portion, picked: true },
-    { text: FOOD.mixins, optional: true }
-  ]);
-  const thirdItems = [
-    { text: protein.portion, picked: true },
-    { text: carb.portion, picked: true },
-    { text: '½ avocado (about 50–70 g flesh; counted at 60 g)', picked: true }
-  ].concat(FOOD.sides);
-  const salmonNote = plate.proteinId === 'salmon'
-    ? 'Salmon is on this plate. No sardines. On plates without salmon, use the omega-3 supplement.'
-    : 'No sardines. Salmon is an optional bowl swap, not a weekly quota. Use the omega-3 supplement when salmon is not on the plate.';
-  const planned = plannedDayMacros(plate, eatenDay), eaten = eatenDayMacros(plate, eatenDay);
-  const proteinLeft = NUTRITION.protein - eaten.p;
-  const leftLine = proteinLeft >= 0
-    ? `Protein left today: about ${proteinLeft} g of the ${NUTRITION.protein} g target.`
-    : `Protein is about ${Math.abs(proteinLeft)} g over the ${NUTRITION.protein} g target.`;
-  return `<div class="card"><h3>1 · Yoghurt bowl</h3>${macroLine(plate.yoghurt)}
-      ${choiceSeg('Sweetener', 'sweetener', [{ id: 'maple', name: 'Maple' }, { id: 'honey', name: 'Honey' }], plate.sweetener)}
-      <details class="fold"><summary>What's in it</summary>${portionsHtml(yoghurtItems)}</details>
-      ${eatenToggle('meal', 'yoghurt', eatenDay.meals.yoghurt)}</div>
-    <div class="card"><h3>2 · ${esc(FOOD.egg.name)}</h3>${macroLine(plate.egg)}
-      <details class="fold"><summary>What's in it</summary>${portionsHtml(FOOD.egg.items)}</details>
-      ${eatenToggle('meal', 'egg', eatenDay.meals.egg)}</div>
-    <div class="card"><h3>3 · ${esc(thirdName)}</h3>
-      ${macroLine(plate.third)}
-      ${choiceSeg('Third meal', 'meal3', [{ id: 'bowl', name: 'Protein bowl' }, { id: 'steak', name: 'Steak plate' }], plate.meal3)}
-      ${plate.meal3 === 'bowl' ? `<div class="picklabel">Protein</div>${proteinPicks(plate.protein)}` : `<div class="note">Same sides as the bowl, served on a plate. Protein is the steak, not the mince swaps.</div>`}
-      ${choiceSeg('Carb base', 'carb', [{ id: 'rice', name: 'Rice' }, { id: 'sweet', name: 'Sweet potato' }], plate.carb)}
-      <details class="fold"><summary>What's on the plate</summary>${portionsHtml(thirdItems)}</details>
-      <div class="note">${esc(salmonNote)}</div>
-      ${eatenToggle('meal', 'third', eatenDay.meals.third)}
-    </div>
-    ${renderSnacks(plate, eatenDay)}
-    ${renderCustomFoods(eatenDay)}
-    <div class="card"><b>Today</b>
-      <div class="muted small" style="margin-top:4px">Eaten against planned. Tick a meal or snack once you've had it. Snacks on: ${plate.snack.picked.length ? esc(plate.snack.picked.map(x => x.short).join(' · ')) : 'none'}.</div>
-      <div class="picklabel">Eaten</div>
-      ${macroStats(eaten)}
-      <div class="picklabel">Planned</div>
-      ${macroStats(planned)}
-      <div class="muted small" style="margin-top:10px">${esc(leftLine)} Target board: ${NUTRITION.kcal} kcal, until body measurements are set.</div>
-      ${eatenDay.custom.length ? '<div class="muted small">Added foods are in these calorie totals only, not the micronutrient estimates.</div>' : ''}
-    </div>
-    ${microHtml(plate)}
-    <details class="card fold"><summary>How to eat this</summary><ul class="bul small">${FOOD.rules.map(r => `<li>${esc(r)}</li>`).join('')}</ul></details>`;
+  const day = normaliseFoodDay(st.days && st.days[todayStr()], st.picks);
+  return dashHtml(st) + FOOD_PLAN.meals.map(m => mealCard(st, day, m)).join('') + addedCard(day) +
+    `<details class="card fold" data-keep="rules"><summary>How to eat this</summary><ul class="bul small">${FOOD_PLAN.rules.map(r => `<li>${esc(r)}</li>`).join('')}</ul></details>`;
+}
+let paintingMeals = false;
+function paintMealChecks() {
+  paintingMeals = true;
+  document.querySelectorAll('input[data-meal]').forEach(el => {
+    el.indeterminate = el.dataset.state === 'part';
+    el.checked = el.dataset.state === 'on';
+  });
+  paintingMeals = false;
 }
 function renderFood(arg) {
   const mode = arg === 'shop' ? 'shop' : 'meals';
   const st = foodState();
-  view().innerHTML = `<div class="row between"><h1 style="margin:0">Food</h1><span class="muted small">Locked ${esc(FOOD.locked)}</span></div>
-    <div class="muted small" style="margin-top:4px">${esc(FOOD.board)}</div>
-    <div class="muted small">${esc(FOOD.estimate)}</div>
+  view().innerHTML = `<h1>Food</h1>
+    <div class="muted small">Today against the Sillz targets.</div>
     ${mode === 'meals' ? askBarHtml(true) : ''}
     ${foodSeg(mode)}
     ${mode === 'shop' ? renderShop() : renderMeals(st)}`;
+  paintMealChecks();
 }
+
 function foodArg() {
   return (location.hash.replace(/^#\/?/, '').split('/')[1]) || '';
 }
@@ -873,7 +774,7 @@ function renderRules() {
     <li>Missed a session? Don't double up. Do the next one.</li>
     <li>Short on time? Explosive moves and the 2 main lifts only.</li></ul></details>
   <details class="card fold"><summary>Habits</summary><ul class="bul">
-    <li>Protein 175 g and 2500 kcal a day.</li><li>Sleep 8 hours, up with the sun.</li>
+    <li>About 178 g protein and 2,750 kcal a day.</li><li>Sleep 8 hours, up with the sun.</li>
     <li>No phone during rest. Breathe and drink water.</li><li>12+ months for a real transformation. Be better, not perfect.</li></ul></details>`;
 }
 
@@ -1002,9 +903,11 @@ function renderAskLog() {
   if (!log) return;
   const undo = load(LS.aiUndo, null);
   const msgs = aiChat.map(m => {
-    const changes = m.changes && m.changes.length ? `<div class="ask-changes">${m.changes.map(esc).join('<br>')}</div>` : '';
+    const text = String(m.text || '');
+    const list = Array.isArray(m.changes) ? m.changes.filter(c => text.indexOf(c) === -1) : [];
+    const changes = list.length ? `<div class="ask-changes">${list.map(esc).join('<br>')}</div>` : '';
     const skipped = m.skipped && m.skipped.length ? `<div class="muted small">${m.skipped.map(esc).join('<br>')}</div>` : '';
-    return `<div class="ask-msg ${m.role === 'user' ? 'user' : 'model'}${m.warn ? ' warn' : ''}">${esc(m.text)}${changes}${skipped}</div>`;
+    return `<div class="ask-msg ${m.role === 'user' ? 'user' : 'model'}${m.warn ? ' warn' : ''}">${esc(text)}${changes}${skipped}</div>`;
   }).join('');
   const undoHtml = undo && undo.summary
     ? `<div class="note">${esc(undo.summary)}<button type="button" class="btn small ghost" style="margin-top:8px" data-act="ask-undo">Undo</button></div>`
@@ -1017,7 +920,7 @@ function renderAskLog() {
         <input id="ask-key" class="keyin" type="password" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="Paste your Gemini API key">
         <button type="button" class="btn small" style="margin-top:8px" data-act="gemini-save" data-for="ask-key">Save key</button>
       </div>`;
-  const empty = aiChat.length ? '' : `<div class="muted small" style="margin:8px 0">Dictate or type what you ate, then tap Send. Or ask how much protein is left. Target is ${NUTRITION.protein} g protein and ${comma(NUTRITION.kcal)} kcal.</div>`;
+  const empty = aiChat.length ? '' : `<div class="muted small" style="margin:8px 0">Dictate or type what you ate, then tap Send. Or ask what you are low on. Target is ${NUTRITION.protein} g protein and ${comma(NUTRITION.kcal)} kcal.</div>`;
   log.innerHTML = `${keyHtml}
     <label class="toggle"><span><b>Read replies aloud</b><br><span class="muted small">Short replies. Australian English when the phone has that voice.</span></span>
       <input type="checkbox" id="ask-speak" ${speakEnabled() ? 'checked' : ''}></label>
@@ -1164,20 +1067,22 @@ function speakReply(text) {
   } catch (e) {}
 }
 function refreshFoodViews() {
+  const open = [];
+  document.querySelectorAll('details[data-keep]').forEach(d => { if (d.open) open.push(d.dataset.keep); });
   const h = location.hash.replace(/^#\/?/, '') || 'home';
   const [p, arg] = h.split('/');
   const y = scrollY;
   if (p === 'food') renderFood(arg || '');
   else if (p === 'home' || p === '') renderHome();
+  document.querySelectorAll('details[data-keep]').forEach(d => { if (open.indexOf(d.dataset.keep) !== -1) d.open = true; });
   scrollTo(0, y);
 }
 function undoAi() {
   const snap = load(LS.aiUndo, null);
   if (!snap || !snap.before) { toast('Nothing to undo'); return; }
   const st = foodState();
-  st.picks = snap.before.picks;
-  st.snacks = snap.before.snacks;
-  if (snap.before.day) st.days[snap.date] = snap.before.day;
+  if (snap.before.picks) st.picks = normalisePicks(snap.before.picks, snap.before.snacks);
+  if (snap.before.day) st.days[snap.date] = normaliseFoodDay(snap.before.day, st.picks, snap.before.snacks);
   else delete st.days[snap.date];
   saveFood(st);
   localStorage.removeItem(LS.aiUndo);
@@ -1185,10 +1090,41 @@ function undoAi() {
   refreshFoodViews();
   renderAskLog();
 }
+function aiMockOn() {
+  return window.FOOD_AI_MOCK === true || /(?:\?|&)ai=mock(?:&|$)/.test(location.search);
+}
+function applyAskResult(parsed) {
+  const before = foodState();
+  const applied = applyFoodActions(before, parsed.actions, todayStr());
+  if (applied.changed) {
+    save(LS.aiUndo, {
+      date: todayStr(),
+      summary: applied.changes.join('. '),
+      before: { picks: before.picks, day: before.days[todayStr()] || blankFoodDay() }
+    });
+    saveFood(applied.state);
+    refreshFoodViews();
+  }
+  const reply = parsed.reply || (applied.changes.length ? 'Updated today\'s food.' : 'No change.');
+  pushAi({ role: 'model', text: reply, at: Date.now(), changes: applied.changes, skipped: applied.skipped });
+  renderAskLog();
+  speakReply(reply);
+}
 async function sendAsk(text) {
   text = String(text || '').trim();
   if (!text || aiBusy) return;
-  if (!geminiKey()) {
+  const local = localFoodAnswer(text, foodState(), todayStr());
+  if (local) {
+    const input = $('#ask-input');
+    if (input) input.value = '';
+    pushAi({ role: 'user', text, at: Date.now() });
+    pushAi({ role: 'model', text: local, at: Date.now(), local: true });
+    renderAskLog();
+    speakReply(local);
+    return;
+  }
+  const mock = aiMockOn();
+  if (!mock && !geminiKey()) {
     const input = $('#ask-input');
     if (input) input.value = text;
     pushAi({ role: 'model', text: 'Add your free Gemini key first. It stays on this phone.', at: Date.now(), local: true, warn: true });
@@ -1201,7 +1137,7 @@ async function sendAsk(text) {
   if (input) input.value = '';
   const live = $('#ask-live');
   if (live) live.textContent = '';
-  if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+  if (!mock && typeof navigator !== 'undefined' && navigator.onLine === false) {
     pushAi({ role: 'user', text, at: Date.now() });
     pushAi({ role: 'model', text: 'Ask AI needs internet.', at: Date.now(), local: true, warn: true });
     renderAskLog();
@@ -1215,6 +1151,7 @@ async function sendAsk(text) {
   renderAskLog();
   const prior = aiChat.slice(0, -1);
   try {
+    if (mock) { applyAskResult(mockGeminiFood(text)); return; }
     const body = geminiRequestBody(foodState(), todayStr(), prior, text);
     const res = await fetch(GEMINI_URL, {
       method: 'POST',
@@ -1225,22 +1162,7 @@ async function sendAsk(text) {
     let data = null;
     try { data = await res.json(); } catch (e) { data = null; }
     if (!res.ok) throw Object.assign(new Error('api'), { code: res.status });
-    const parsed = parseGeminiFood(data);
-    const applied = applyFoodActions(foodState(), parsed.actions, todayStr());
-    if (applied.changed) {
-      const st = foodState();
-      save(LS.aiUndo, {
-        date: todayStr(),
-        summary: applied.changes.join('. '),
-        before: { picks: st.picks, snacks: st.snacks, day: normaliseFoodDay(st.days && st.days[todayStr()]) }
-      });
-      saveFood(applied.state);
-      refreshFoodViews();
-    }
-    const reply = parsed.reply || (applied.changes.length ? 'Updated today\'s food.' : 'No change.');
-    pushAi({ role: 'model', text: reply, at: Date.now(), changes: applied.changes, skipped: applied.skipped });
-    renderAskLog();
-    speakReply(reply);
+    applyAskResult(parseGeminiFood(data));
   } catch (err) {
     const offline = navigator.onLine === false || (err && err.name === 'TypeError');
     const msg = offline ? geminiErrorText(0, false) : geminiErrorText(Number(err && err.code) || 0, true);
@@ -1277,25 +1199,28 @@ document.addEventListener('change', e => {
     save(LS.aiSpeak, !!e.target.checked);
     if (!e.target.checked && window.speechSynthesis) { try { speechSynthesis.cancel(); } catch (err) {} }
   }
-  if (e.target.dataset && e.target.dataset.eaten) {
-    const st = foodState(), date = todayStr();
-    const day = normaliseFoodDay(st.days && st.days[date]);
-    const kind = e.target.dataset.eaten, id = e.target.dataset.id, on = e.target.checked;
-    if (kind === 'meal' && MEAL_IDS.indexOf(id) !== -1) day.meals[id] = on;
-    else if (kind === 'snack' && FOOD.snackById[id]) {
-      if (on) {
-        day.snacks[id] = true;
-        const sel = Object.assign({}, snackState(st.snacks).sel);
-        if (!sel[id]) { sel[id] = FOOD.snackById[id].defaultPortion; st.snacks = snacksToStore(sel); }
-      } else delete day.snacks[id];
-    } else if (kind === 'custom') {
-      const item = day.custom.find(c => c.id === id);
-      if (!item) return;
-      item.eaten = on;
-    } else return;
-    st.days[date] = day;
-    saveFood(st);
-    const y = scrollY; renderFood(foodArg()); scrollTo(0, y);
+  if (paintingMeals) return;
+  if (e.target.dataset && e.target.dataset.meal) {
+    const op = e.target.dataset.state === 'on' ? 'clear_meal' : 'add_meal';
+    const applied = applyFoodActions(foodState(), [{ op, meal: e.target.dataset.meal }], todayStr());
+    if (applied.changed) saveFood(applied.state);
+    refreshFoodViews();
+  }
+  if (e.target.dataset && e.target.dataset.mush != null) {
+    const applied = applyFoodActions(foodState(), [{ op: 'set_mushrooms', on: e.target.checked }], todayStr());
+    if (applied.changed) saveFood(applied.state);
+    refreshFoodViews();
+  }
+  if (e.target.dataset && e.target.dataset.swap) {
+    const applied = applyFoodActions(foodState(), [{ op: 'set_swap', slot: e.target.dataset.swap, id: e.target.value }], todayStr());
+    if (applied.changed) saveFood(applied.state);
+    refreshFoodViews();
+  }
+  if (e.target.dataset && e.target.dataset.grams) {
+    const g = Math.round(Number(e.target.value));
+    if (!g || g < 1 || g > 2500) { refreshFoodViews(); return; }
+    const res = setItemGrams(foodState(), todayStr(), e.target.dataset.grams, g);
+    if (res.changed) { saveFood(res.state); refreshFoodViews(); }
   }
 });
 document.addEventListener('click', e => {
@@ -1331,44 +1256,19 @@ document.addEventListener('click', e => {
   else if (act === 'hiit-skip') { unlockAudio(); pNext(false); }
   else if (act === 'mob-prev') { unlockAudio(); pPrev(); }
   else if (act === 'food-view') go(b.dataset.v === 'shop' ? '#/food/shop' : '#/food');
-  else if (act === 'food-pick') {
-    const st = foodState(), k = b.dataset.k, v = b.dataset.v;
-    const ok = { sweetener: { maple: 1, honey: 1 }, meal3: { bowl: 1, steak: 1 }, protein: { mince: 1, thigh: 1, salmon: 1, venison: 1, bison: 1 }, carb: { rice: 1, sweet: 1 } };
-    if (!ok[k] || !ok[k][v] || st.picks[k] === v) return;
-    st.picks[k] = v; saveFood(st);
-    const y = scrollY; renderFood(foodArg()); scrollTo(0, y);
-  } else if (act === 'snack-toggle' || act === 'snack-portion') {
-    const item = FOOD.snackById[b.dataset.id];
-    if (!item) return;
-    const st = foodState();
-    const sel = Object.assign({}, snackState(st.snacks).sel);
-    if (act === 'snack-toggle') sel[item.id] = sel[item.id] ? null : item.defaultPortion;
-    else {
-      const v = b.dataset.v;
-      if (!item.portions[v]) return;
-      sel[item.id] = sel[item.id] === v && b.dataset.off ? null : v;
-    }
-    st.snacks = snacksToStore(sel);
-    if (!sel[item.id] && st.days && st.days[todayStr()]) {
-      const day = normaliseFoodDay(st.days[todayStr()]);
-      if (day.snacks[item.id]) { delete day.snacks[item.id]; st.days[todayStr()] = day; }
-    }
-    saveFood(st);
-    const y = scrollY; renderFood(foodArg()); scrollTo(0, y);
+  else if (act === 'log-add') {
+    const applied = applyFoodActions(foodState(), [{ op: 'add', id: b.dataset.id, meal: b.dataset.meal }], todayStr());
+    if (applied.changed) saveFood(applied.state);
+    refreshFoodViews();
+  } else if (act === 'log-del') {
+    const applied = applyFoodActions(foodState(), [{ op: 'remove', uid: b.dataset.uid }], todayStr());
+    if (applied.changed) { saveFood(applied.state); toast('Removed'); }
+    refreshFoodViews();
   } else if (act === 'shop-reset') {
     const st = foodState();
     if (!Object.keys(st.checks).length) { toast('Nothing to clear'); return; }
     if (!confirm('Clear every tick for a new week?')) return;
     st.checks = {}; saveFood(st); renderFood('shop'); scrollTo(0, 0); toast('Shopping list cleared');
-  } else if (act === 'custom-del') {
-    const st = foodState(), date = todayStr();
-    const day = normaliseFoodDay(st.days && st.days[date]);
-    const next = day.custom.filter(c => c.id !== b.dataset.id);
-    if (next.length === day.custom.length) return;
-    day.custom = next;
-    st.days[date] = day;
-    saveFood(st);
-    const y = scrollY; renderFood(foodArg()); scrollTo(0, y); toast('Removed');
   } else if (act === 'ask-open') {
     if ($('#ask').classList.contains('hidden')) openAsk();
     else if (geminiKey() && speechSupported()) startListen();
