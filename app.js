@@ -903,9 +903,11 @@ function renderAskLog() {
   if (!log) return;
   const undo = load(LS.aiUndo, null);
   const msgs = aiChat.map(m => {
-    const changes = m.changes && m.changes.length ? `<div class="ask-changes">${m.changes.map(esc).join('<br>')}</div>` : '';
+    const text = String(m.text || '');
+    const list = Array.isArray(m.changes) ? m.changes.filter(c => text.indexOf(c) === -1) : [];
+    const changes = list.length ? `<div class="ask-changes">${list.map(esc).join('<br>')}</div>` : '';
     const skipped = m.skipped && m.skipped.length ? `<div class="muted small">${m.skipped.map(esc).join('<br>')}</div>` : '';
-    return `<div class="ask-msg ${m.role === 'user' ? 'user' : 'model'}${m.warn ? ' warn' : ''}">${esc(m.text)}${changes}${skipped}</div>`;
+    return `<div class="ask-msg ${m.role === 'user' ? 'user' : 'model'}${m.warn ? ' warn' : ''}">${esc(text)}${changes}${skipped}</div>`;
   }).join('');
   const undoHtml = undo && undo.summary
     ? `<div class="note">${esc(undo.summary)}<button type="button" class="btn small ghost" style="margin-top:8px" data-act="ask-undo">Undo</button></div>`
