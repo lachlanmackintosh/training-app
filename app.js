@@ -902,6 +902,9 @@ function renderAskLog() {
   const log = $('#ask-log');
   if (!log) return;
   const undo = load(LS.aiUndo, null);
+  const summary = undo && undo.summary ? String(undo.summary) : '';
+  const lastModel = [...aiChat].reverse().find(m => m.role === 'model');
+  const summaryShown = summary && lastModel && String(lastModel.text || '').indexOf(summary) !== -1;
   const msgs = aiChat.map(m => {
     const text = String(m.text || '');
     const list = Array.isArray(m.changes) ? m.changes.filter(c => text.indexOf(c) === -1) : [];
@@ -909,8 +912,8 @@ function renderAskLog() {
     const skipped = m.skipped && m.skipped.length ? `<div class="muted small">${m.skipped.map(esc).join('<br>')}</div>` : '';
     return `<div class="ask-msg ${m.role === 'user' ? 'user' : 'model'}${m.warn ? ' warn' : ''}">${esc(text)}${changes}${skipped}</div>`;
   }).join('');
-  const undoHtml = undo && undo.summary
-    ? `<div class="note">${esc(undo.summary)}<button type="button" class="btn small ghost" style="margin-top:8px" data-act="ask-undo">Undo</button></div>`
+  const undoHtml = summary
+    ? `<div class="note">${summaryShown ? '' : esc(summary)}<button type="button" class="btn small ghost"${summaryShown ? '' : ' style="margin-top:8px"'} data-act="ask-undo">Undo</button></div>`
     : '';
   const hasKey = !!geminiKey();
   const keyHtml = hasKey
