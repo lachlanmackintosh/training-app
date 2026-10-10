@@ -196,406 +196,55 @@ const EFFORT = [
   ['10', 'All-out', 'Can\u2019t talk. Sprints only.']
 ];
 
-const NUTRITION = { kcal: 2500, protein: 175, carbs: 220, fat: 100 };
+const NUTRITION = { kcal: 2750, protein: 178, carbs: 255, fat: 120 };
 
-/* Meals, 6 Oct 2026, with in-meal swaps. No rice-day / sweet-potato-day mode.
-   Default macros start from the locked board, then two portion edits:
-   - Egg bread is 2 slices counted at 120 g, not a fixed 125 g blob: −10 kcal, −2 g carbs.
-   - A second ½ avocado (about 60 g flesh) is on the bowl or steak plate.
-     USDA-style Hass, rounded: +95 kcal, +1 g protein, +5 g carbs, +9 g fat.
-     The egg-meal half was already inside the locked 930 kcal line.
-   Protein and honey deltas are generic AFCD/USDA-style differences vs that plate.
-   Rounded. Not a lab assay. Micros stay coarse on purpose. */
-const FOOD = {
-  locked: '6 Oct 2026',
-  board: 'Locked macro board is still about 2,500 kcal until body measurements are set. Totals below follow the swaps you pick.',
-  estimate: 'Estimates. Locked 6 Oct meals, plus generic AFCD/USDA-style values for each swap and snack (Jalna and Chief-style labels where a product is named). Rounded. Not a lab result.',
-  defaults: { sweetener: 'maple', meal3: 'bowl', protein: 'mince', carb: 'rice' },
-  sweeteners: {
-    maple: { name: 'Maple', portion: '15 g maple syrup', macros: { kcal: 640, p: 52, c: 41, f: 29 } },
-    honey: { name: 'Honey', portion: '15 g honey', macros: { kcal: 645, p: 52, c: 43, f: 29 } }
-  },
-  yoghurtItems: [
-    { text: '300 g Jalna organic full-fat Greek-style yoghurt' },
-    { text: '50 g Chief unflavoured whey' },
-    { text: '200 g organic berries (100 g strawberries, 50 g blueberries, 50 g raspberries)' }
-  ],
-  mixins: 'Ceylon cinnamon and bee pollen, stirred into the sweetener',
-  egg: {
-    name: 'Egg meal',
-    /* Locked line was 930 kcal, 62 g protein, 71 g carbs, 42 g fat with 125 g bread and 60 g avocado. */
-    macros: { kcal: 920, p: 62, c: 69, f: 42 },
-    items: [
-      { text: '4 eggs (~200 g edible before cooking)' },
-      { text: '100 g full-fat cottage cheese' },
-      { text: '2 slices organic sourdough (about 55–62 g each, 110–125 g before toasting; counted at 120 g)', picked: true },
-      { text: '½ avocado (about 50–70 g flesh; counted at 60 g)', picked: true },
-      { text: '250 mL full-fat pasteurised / A2 cow milk' }
-    ]
-  },
-  /* Bowl totals from the locked board, mince included, without the new ½ avocado. */
-  carbs: {
-    rice: { name: 'Rice', portion: '300 g cooked white rice', base: { kcal: 930, p: 61, c: 109, f: 25 } },
-    sweet: { name: 'Sweet potato', portion: '350 g cooked orange sweet potato', base: { kcal: 735, p: 58, c: 61, f: 25 } }
-  },
-  avocadoHalf: { kcal: 95, p: 1, c: 5, f: 9 },
-  /* Deltas vs 180 g raw lean beef mince (~5% fat: about 245 kcal, 39 g protein, 9 g fat).
-     Per 100 g × 1.8, rounded to about 5 kcal and 1 g:
-     chicken thigh, skinless — 144 kcal, 19 g protein, 8 g fat
-     wild sockeye-style salmon — 170 kcal, 22 g protein, 8.5 g fat (farmed is fattier)
-     venison — 120 kcal, 23 g protein, 2.4 g fat
-     bison, ground — 146 kcal, 20 g protein, 7 g fat
-     trimmed steak — 150 kcal, 22 g protein, 6 g fat */
-  proteins: {
-    mince: { name: 'Lean beef mince', short: 'Mince', portion: '180 g lean grass-fed mince (raw, about 5% fat)', delta: { kcal: 0, p: 0, c: 0, f: 0 } },
-    thigh: { name: 'Chicken thigh', short: 'Chicken thigh', portion: '180 g skinless chicken thigh (raw)', delta: { kcal: 10, p: -5, c: 0, f: 5 } },
-    salmon: { name: 'Salmon', short: 'Salmon', portion: '180 g wild-caught salmon (raw)', delta: { kcal: 60, p: 1, c: 0, f: 6 } },
-    venison: { name: 'Venison', short: 'Venison', portion: '180 g venison (raw)', delta: { kcal: -30, p: 2, c: 0, f: -5 } },
-    bison: { name: 'Bison', short: 'Bison', portion: '180 g bison (raw)', delta: { kcal: 15, p: -3, c: 0, f: 4 } },
-    steak: { name: 'Grass-fed steak', short: 'Steak', portion: '180 g grass-fed grass-finished steak (raw, trimmed)', delta: { kcal: 25, p: 1, c: 0, f: 2 } }
-  },
-  sides: [
-    { text: '150 g cooked drained broccoli' },
-    { text: '30 g rocket (wilt)' },
-    { text: '50 g red onion' },
-    { text: '20 g cheddar' },
-    { text: '10 g extra virgin olive oil' },
-    { text: 'Garlic, herbs', optional: true }
-  ],
-  /* Snacks replace the locked "daily extras" line (160 kcal, 3 g protein, 33 g carbs, 1 g fat).
-     Default-on carrot + gold kiwi + 150 mL orange juice are split so they still sum to that line:
-       carrot 100 g      35 kcal, 1 g protein,  5 g carbs, 0 g fat
-       gold kiwi 100 g   60 kcal, 1 g protein, 12 g carbs, 0 g fat
-       orange juice 150  65 kcal, 1 g protein, 16 g carbs, 1 g fat
-     The 1 g fat is the locked-line remainder, parked on the juice. Other portions are generic
-     AFCD/USDA-style available-carbohydrate estimates, rounded to about 5 kcal and 1 g.
-     Micros on that default trio are already inside micros.base. snackState() returns the
-     difference from the trio, plus anything else that is on. Coarse on purpose. */
-  snackIntro: 'Pick what you eat today. Each pick adds its calories, macros and a coarse micronutrient estimate. Carrot, gold kiwi and 150 mL orange juice start on, so the day matches the locked extras until you change them. Everything else stays off.',
-  snackGroups: [
-    { id: 'daily', title: 'With the day', note: 'The old daily extras. One seasonal fruit: gold kiwi is the default in the numbers. Mango, banana, apple, mandarin, orange and pineapple are the usual Gold Coast options.' },
-    { id: 'more', title: 'Optional fruit', note: 'Extra, on top of the fruit above. Off until you pick one.' },
-    { id: 'drinks', title: 'Drinks', note: 'Orange juice starts on at 150 mL. Coffee, green tea and yerba mate are near zero calories. Caffeine is a note, not a macro.' },
-    { id: 'cheese', title: 'Cheese', note: 'About 30 g, on top of the 20 g cheddar in the third meal. K2 varies by cheese and age, so it is not given a number.' },
-    { id: 'other', title: 'Other', note: 'A drizzle is extra sweetener, on top of the yoghurt bowl. Ice cream is occasional.' }
-  ],
-  snackItems: [
-    { id: 'carrot', group: 'daily', name: 'Raw carrot', short: 'Carrot', defaultOn: true, defaultPortion: '100', reference: '100',
-      portions: {
-        '100': { label: '100 g', short: 'Carrot', macros: { kcal: 35, p: 1, c: 5, f: 0 }, micro: { a: 1000, fibre: 3, k: 300, mg: 10 } }
-      } },
-    { id: 'fruit', group: 'daily', name: 'Seasonal fruit', choose: true, defaultOn: true, defaultPortion: 'kiwi', reference: 'kiwi',
-      note: 'One serve. Tap the highlighted fruit again to have none.',
-      portions: {
-        kiwi: { name: 'Gold kiwi', label: '100 g', short: 'Gold kiwi', note: 'Default fruit in the locked extras.',
-          macros: { kcal: 60, p: 1, c: 12, f: 0 }, micro: { e: 1, mg: 15, fibre: 2, k: 300, folate: 50 } },
-        mango: { name: 'Mango', label: '150 g flesh (about half)', short: 'Mango',
-          macros: { kcal: 90, p: 1, c: 20, f: 1 }, micro: { a: 150, e: 1, mg: 15, fibre: 3, k: 250, folate: 50 } },
-        banana: { name: 'Banana', label: '1 medium, about 120 g', short: 'Banana',
-          macros: { kcal: 105, p: 1, c: 24, f: 0 }, micro: { mg: 30, fibre: 3, k: 400, folate: 25 } },
-        apple: { name: 'Apple', label: '1 medium, about 180 g', short: 'Apple',
-          macros: { kcal: 95, p: 0, c: 21, f: 0 }, micro: { fibre: 4, k: 200 } },
-        mandarin: { name: 'Mandarin', label: '1 medium, about 90 g', short: 'Mandarin',
-          macros: { kcal: 50, p: 1, c: 10, f: 0 }, micro: { fibre: 1, k: 150, folate: 25 } },
-        orange: { name: 'Orange', label: '1 medium, about 130 g', short: 'Orange',
-          macros: { kcal: 60, p: 1, c: 12, f: 0 }, micro: { mg: 15, fibre: 3, k: 250, folate: 50 } },
-        pineapple: { name: 'Pineapple', label: '100 g', short: 'Pineapple',
-          macros: { kcal: 50, p: 0, c: 12, f: 0 }, micro: { mg: 10, fibre: 1, k: 150 } }
-      } },
-    { id: 'pom', group: 'more', name: 'Organic pomegranate', short: 'Pomegranate', defaultPortion: '100',
-      note: '100 g arils, about half a small fruit.',
-      portions: {
-        '100': { label: '100 g arils', short: 'Pomegranate', macros: { kcal: 85, p: 2, c: 15, f: 1 }, micro: { fibre: 4, k: 250, folate: 50 } }
-      } },
-    { id: 'berries', group: 'more', name: 'Berries extra', short: 'Extra berries', defaultPortion: '100',
-      note: 'Another 100 g of the yoghurt-bowl mix: strawberries, blueberries, raspberries. On top of the 200 g already in that bowl.',
-      portions: {
-        '100': { label: '100 g mixed berries', short: 'Extra berries', macros: { kcal: 45, p: 1, c: 7, f: 0 }, micro: { fibre: 3, k: 150, folate: 25 } }
-      } },
-    { id: 'dates', group: 'more', name: 'Medjool dates', short: 'Dates', defaultPortion: '2',
-      note: 'One Medjool date is about 24 g.',
-      portions: {
-        '1': { label: '1 date', short: '1 date', macros: { kcal: 65, p: 0, c: 16, f: 0 }, micro: { mg: 15, fibre: 2, k: 200 } },
-        '2': { label: '2 dates', short: '2 dates', macros: { kcal: 135, p: 1, c: 32, f: 0 }, micro: { mg: 30, fibre: 4, k: 400 } },
-        '3': { label: '3 dates', short: '3 dates', macros: { kcal: 200, p: 1, c: 48, f: 0 }, micro: { mg: 45, fibre: 6, k: 600 } }
-      } },
-    { id: 'oj', group: 'drinks', name: 'Organic orange juice', short: 'Orange juice', defaultOn: true, defaultPortion: '150', reference: '150',
-      portions: {
-        '150': { label: '150 mL', short: 'OJ 150 mL', note: 'Starts on. The 1 g of fat is the locked extras, rounded onto this line.',
-          macros: { kcal: 65, p: 1, c: 16, f: 1 }, micro: { mg: 15, k: 300, folate: 50 } },
-        '250': { label: '250 mL', short: 'OJ 250 mL', note: 'A full glass.',
-          macros: { kcal: 110, p: 2, c: 27, f: 1 }, micro: { mg: 25, k: 500, folate: 80 } }
-      } },
-    { id: 'pomjuice', group: 'drinks', name: 'Pomegranate juice', short: 'Pomegranate juice', defaultPortion: '150',
-      portions: {
-        '150': { label: '150 mL', short: 'Pomegranate juice', macros: { kcal: 80, p: 0, c: 20, f: 0 }, micro: { k: 400 } },
-        '250': { label: '250 mL', short: 'Pomegranate juice 250 mL', macros: { kcal: 135, p: 0, c: 33, f: 1 }, micro: { k: 650 } }
-      } },
-    { id: 'cherry', group: 'drinks', name: 'Tart-cherry juice', short: 'Tart-cherry juice', defaultPortion: '150',
-      note: 'Unsweetened juice, not a concentrate shot.',
-      portions: {
-        '150': { label: '150 mL', short: 'Tart-cherry juice', macros: { kcal: 80, p: 0, c: 18, f: 0 }, micro: { k: 250 } },
-        '250': { label: '250 mL', short: 'Tart-cherry juice 250 mL', macros: { kcal: 135, p: 0, c: 30, f: 0 }, micro: { k: 400 } }
-      } },
-    { id: 'kefir', group: 'drinks', name: 'Kefir', short: 'Kefir', defaultPortion: '200',
-      note: 'Full-fat. An extra, not a swap for the milk in the egg meal.',
-      portions: {
-        '100': { label: '100 mL', short: 'Kefir 100 mL', macros: { kcal: 60, p: 3, c: 4, f: 3 }, micro: { mg: 10, k: 150, iodine: 15 } },
-        '200': { label: '200 mL', short: 'Kefir', macros: { kcal: 120, p: 7, c: 8, f: 7 }, micro: { mg: 20, k: 300, iodine: 30 } }
-      } },
-    { id: 'xmilk', group: 'drinks', name: 'Extra full-fat milk', short: 'Extra milk', defaultPortion: '150',
-      note: 'On top of the 250 mL already in the egg meal.',
-      portions: {
-        '150': { label: '150 mL', short: 'Extra milk 150 mL', macros: { kcal: 100, p: 5, c: 7, f: 5 }, micro: { mg: 20, k: 200, iodine: 25 } },
-        '250': { label: '250 mL', short: 'Extra milk 250 mL', macros: { kcal: 165, p: 9, c: 12, f: 9 }, micro: { mg: 30, k: 350, iodine: 40 } }
-      } },
-    { id: 'broth', group: 'drinks', name: 'Bone broth', short: 'Bone broth', defaultPortion: '250', tag: 'broth',
-      note: 'One mug. Protein is a coarse homemade estimate. Sodium and minerals depend on the bones and the salt, so they are not added to the totals.',
-      portions: {
-        '250': { label: '250 mL', short: 'Bone broth', macros: { kcal: 40, p: 6, c: 0, f: 1 } }
-      } },
-    { id: 'coffee', group: 'drinks', name: 'Coffee', short: 'Coffee', defaultPortion: '1', tag: 'caffeine',
-      note: 'Black. Near zero calories. Milk belongs on the extra-milk line.',
-      portions: {
-        '1': { label: '1 cup, 250 mL', chip: '1 cup', short: 'Coffee', caffeine: '80–100 mg', macros: { kcal: 0, p: 0, c: 0, f: 0 } },
-        '2': { label: '2 cups', chip: '2 cups', short: 'Coffee ×2', caffeine: '160–200 mg', macros: { kcal: 0, p: 0, c: 0, f: 0 } }
-      } },
-    { id: 'tea', group: 'drinks', name: 'Green tea', short: 'Green tea', defaultPortion: '1', tag: 'caffeine',
-      note: 'Near zero calories.',
-      portions: {
-        '1': { label: '1 cup, 250 mL', chip: '1 cup', short: 'Green tea', caffeine: '30–50 mg', macros: { kcal: 0, p: 0, c: 0, f: 0 } },
-        '2': { label: '2 cups', chip: '2 cups', short: 'Green tea ×2', caffeine: '60–100 mg', macros: { kcal: 0, p: 0, c: 0, f: 0 } }
-      } },
-    { id: 'mate', group: 'drinks', name: 'Yerba mate', short: 'Yerba mate', defaultPortion: '1', tag: 'caffeine',
-      note: 'Near zero calories. A gourd you keep refilling can be more caffeine than one cup.',
-      portions: {
-        '1': { label: '1 cup, 250 mL', chip: '1 cup', short: 'Yerba mate', caffeine: '70–80 mg', macros: { kcal: 0, p: 0, c: 0, f: 0 } },
-        '2': { label: '2 cups', chip: '2 cups', short: 'Yerba mate ×2', caffeine: '140–160 mg', macros: { kcal: 0, p: 0, c: 0, f: 0 } }
-      } },
-    { id: 'cheddar', group: 'cheese', name: 'Cheddar', short: 'Cheddar', defaultPortion: '30', tag: 'k2',
-      portions: {
-        '30': { label: '30 g', short: 'Cheddar', macros: { kcal: 120, p: 7, c: 1, f: 10 }, micro: { zinc: 1 } }
-      } },
-    { id: 'parmesan', group: 'cheese', name: 'Parmesan', short: 'Parmesan', defaultPortion: '30', tag: 'k2',
-      portions: {
-        '30': { label: '30 g', short: 'Parmesan', macros: { kcal: 130, p: 11, c: 1, f: 9 }, micro: { zinc: 1 } }
-      } },
-    { id: 'gorgonzola', group: 'cheese', name: 'Gorgonzola', short: 'Gorgonzola', defaultPortion: '30', tag: 'k2',
-      portions: {
-        '30': { label: '30 g', short: 'Gorgonzola', macros: { kcal: 105, p: 6, c: 1, f: 9 }, micro: { zinc: 1 } }
-      } },
-    { id: 'drizzle', group: 'other', name: 'Honey or maple drizzle', short: 'Drizzle', defaultPortion: 'honey',
-      note: 'Extra, on top of the 15 g already in the yoghurt bowl.',
-      portions: {
-        honey: { label: '15 g honey', short: 'Honey drizzle', macros: { kcal: 45, p: 0, c: 12, f: 0 } },
-        maple: { label: '15 g maple', short: 'Maple drizzle', macros: { kcal: 40, p: 0, c: 10, f: 0 } }
-      } },
-    { id: 'pollen', group: 'other', name: 'Bee pollen', short: 'Bee pollen', defaultPortion: '5', tag: 'pollen',
-      note: 'A small sprinkle. Not counted toward vitamin E.',
-      portions: {
-        '5': { label: '5 g', short: 'Bee pollen', macros: { kcal: 20, p: 1, c: 2, f: 0 } },
-        '10': { label: '10 g', short: 'Bee pollen 10 g', macros: { kcal: 40, p: 2, c: 4, f: 0 } }
-      } },
-    { id: 'ferment', group: 'other', name: 'Sauerkraut, kimchi or pickles', short: 'Ferment', defaultPortion: '50', tag: 'salt',
-      note: 'Salty. About 300–400 mg sodium in 50 g of sauerkraut; kimchi and pickles are often higher. Not added as a precise sodium total, and not a vegetable swap.',
-      portions: {
-        '50': { label: '50 g', short: 'Ferment', macros: { kcal: 10, p: 0, c: 1, f: 0 }, micro: { fibre: 1 } },
-        '100': { label: '100 g', short: 'Ferment 100 g', macros: { kcal: 20, p: 1, c: 1, f: 0 }, micro: { fibre: 2 } }
-      } },
-    { id: 'ice', group: 'other', name: 'Ice cream', short: 'Ice cream', defaultPortion: '1', occasional: true,
-      note: 'Occasional. Full-fat vanilla, generic. Not part of the normal day.',
-      portions: {
-        '1': { label: '1 scoop, about 60 g', chip: '1 scoop', short: 'Ice cream', macros: { kcal: 125, p: 2, c: 14, f: 7 } },
-        '2': { label: '2 scoops, about 120 g', chip: '2 scoops', short: 'Ice cream ×2', macros: { kcal: 250, p: 4, c: 29, f: 13 } }
-      } }
-  ],
-  rules: [
-    'Same three meals every day. Change the sweetener, the carb, the third meal, and the snacks. The totals follow the picks.',
-    'No sardines. Salmon is an optional bowl swap when you want it (wild-caught). It is not a twice-weekly quota. An omega-3 supplement covers long-chain fats when salmon is not on the plate.',
-    'No seed oils, vegetable oils, artificials, or undisclosed labels.',
-    'Prefer certified organic berries and grass-finished beef where practical.',
-    'Food first for vitamin E and magnesium. Magnesium glycinate at night only if the plate stays short of about 400 mg. That is the rice plate, not sweet potato.',
-    'Not lectin-free, pesticide-free, or toxin-free. Minimise exposure; don\u2019t chase purity.'
-  ],
-  micros: {
-    covered: ['A', 'B2', 'B3', 'B5', 'B9', 'B12', 'C', 'Calcium', 'Iron', 'Manganese', 'Phosphorus', 'Potassium', 'Selenium', 'Zinc', 'Copper (partial)'],
-    /* Handover mince plate, before the extra bowl avocado. Already rounded. */
-    base: {
-      rice: { e: [10, 11], mg: 335, fibre: 28, iron: 12, zinc: 14, b12: 12, a: 2500, k: 4300, folate: 830, iodine: 275 },
-      sweet: { e: [10, 11], mg: 393, fibre: 37, iron: 13, zinc: 14, b12: 12, a: 4900, k: 5300, folate: 960, iodine: 270 }
-    },
-    /* ~60 g Hass-style avocado. Coarse on purpose. */
-    avocado: { e: 1, mg: 15, fibre: 4, k: 300, folate: 50 },
-    protein: {
-      mince: { iron: 0, zinc: 0, b12: 0 },
-      thigh: { iron: -3, zinc: -6, b12: -3 },
-      salmon: { iron: -3, zinc: -8, b12: 4 },
-      venison: { iron: 2, zinc: 0, b12: 0 },
-      bison: { iron: 0, zinc: 0, b12: 0 },
-      steak: { iron: 0, zinc: 0, b12: 0 }
-    },
-    rows: [
-      ['Vitamin A', '900 µg', '2,510 µg', '4,940 µg', 'Likely covered'],
-      ['B1', '0.8 mg', '0.84 mg', '0.92 mg', 'Before bread B1'],
-      ['B2', '1.3 mg', '3.0 mg', '3.2 mg', 'Likely covered'],
-      ['B3', '16 mg', '40 mg NE', '42 mg NE', 'Likely covered'],
-      ['B5', '5 mg', '6.7 mg', '8.1 mg', 'Likely covered'],
-      ['B6', '1.3 mg', 'Unresolved', 'Unresolved', 'Verify full B6'],
-      ['B9 folate', '400 µg', '825 µg', '955 µg', 'Natural folate'],
-      ['B12', '2.4 µg', '11.5 µg', '11.5 µg', 'Likely covered'],
-      ['Vitamin C', '90 mg', '370 mg', '420 mg', 'Likely covered'],
-      ['Vitamin D', '15 µg', 'Unresolved', 'Unresolved', 'Assess separately'],
-      ['Vitamin E', '15 mg', '10–11 mg', '10–11 mg', 'Gap 4–5 mg'],
-      ['Vitamin K1', '120 µg', 'Likely covered', 'Likely covered', 'Not quantified'],
-      ['Vitamin K2', '200 µg', 'Unresolved', 'Unresolved', 'Not an established RDI'],
-      ['Calcium', '1,000 mg', '1,215 mg', '1,325 mg', 'Likely covered'],
-      ['Copper', '0.9 mg', 'At least 1.2 mg', 'At least 1.4 mg', 'Partial totals'],
-      ['Iron', '8 mg', '11.8 mg', '13.3 mg', 'Likely covered'],
-      ['Magnesium', '400 mg', '335 mg', '393 mg', 'Gap 65 / 7 mg'],
-      ['Manganese', '2.3 mg', '3.6 mg', '4.4 mg', 'Likely covered'],
-      ['Phosphorus', '700 mg', '2,070 mg', '2,085 mg', 'Likely covered'],
-      ['Potassium', '3,400 mg', '4,280 mg', '5,250 mg', 'Likely covered'],
-      ['Selenium', '55 µg', '119 µg', '114 µg', 'Likely covered'],
-      ['Zinc', '11 mg', '14.1 mg', '14.5 mg', 'Likely covered']
-    ],
-    footnotes: [
-      'This table is the handover mince plate only, rice column vs sweet-potato column, before the extra ½ avocado. It does not follow every swap or snack. Use the summary above for this plate.',
-      'Vitamin A figures are Australian retinol equivalents, including plant carotenoids. Not the same as preformed retinol. Sweet potato is the big jump. Protein swaps barely move it.',
-      'Vitamin E on the handover was a range (alpha-tocopherol vs total activity), about 4–5 mg short of 15 mg. The extra ½ avocado adds about 1 mg. Still short.',
-      'Handover magnesium was about 335 mg on rice and 393 mg on sweet potato, before unreported whey minerals. The extra avocado adds about 15 mg.',
-      'Vitamin D, B6 and K2 are unresolved on beef plates. Unresolved is not zero. K2\u2019s 200 µg is a guide comparison, not an established separate requirement. Salmon is the swap that actually supplies vitamin D.',
-      'B1 leaves out bread thiamin until the brand is confirmed. Copper totals are partial. K1 is likely covered and was not quantified.',
-      'Iodine about 275 µg with rice and 270 µg with sweet potato, almost all from the dairy. Protein and carb swaps do not move it. Extra milk or kefir can. Handover fibre was about 28 g rice / 37 g sweet potato, before the extra avocado.',
-      'Omega-3: no sardines. Only the salmon swap puts a large long-chain dose on the plate. An omega-3 supplement covers the other plates.',
-      'Working estimates against the Sillz guide, not a lab export. Missing values are not zero.'
-    ]
-  }
-};
-
-function foodAdd(a, b) {
-  return { kcal: a.kcal + b.kcal, p: a.p + b.p, c: a.c + b.c, f: a.f + b.f };
-}
-const SNACK_MICRO_KEYS = ['e', 'mg', 'fibre', 'iron', 'zinc', 'b12', 'a', 'k', 'folate', 'iodine'];
-function snackMicroBlank() {
-  const o = {};
-  for (const k of SNACK_MICRO_KEYS) o[k] = 0;
-  return o;
-}
-/* Absent keys use defaults (carrot, gold kiwi, 150 mL juice on; everything else off).
-   false, null, or an unknown portion means off. */
-function snackState(raw) {
-  const src = raw && typeof raw === 'object' && !Array.isArray(raw) ? raw : null;
-  const sel = {};
-  const got = snackMicroBlank(), ref = snackMicroBlank();
-  let macros = { kcal: 0, p: 0, c: 0, f: 0 };
-  const picked = [];
-  const tags = {};
-  let custom = false;
-  for (const item of FOOD.snackItems) {
-    const refPortion = item.defaultOn ? item.defaultPortion : null;
-    let chosen = null;
-    if (src && Object.prototype.hasOwnProperty.call(src, item.id)) {
-      const v = src[item.id];
-      chosen = v && item.portions[v] ? v : null;
-    } else chosen = refPortion;
-    sel[item.id] = chosen;
-    if (chosen !== refPortion) custom = true;
-    if (item.reference) {
-      const base = item.portions[item.reference];
-      if (base && base.micro) for (const k of SNACK_MICRO_KEYS) ref[k] += base.micro[k] || 0;
-    }
-    if (!chosen) continue;
-    const portion = item.portions[chosen];
-    macros = foodAdd(macros, portion.macros);
-    if (portion.micro) for (const k of SNACK_MICRO_KEYS) got[k] += portion.micro[k] || 0;
-    if (item.tag) tags[item.tag] = true;
-    picked.push({
-      id: item.id, name: portion.name || item.name, short: portion.short || item.short || item.name,
-      label: portion.label, macros: portion.macros, tag: item.tag || '', caffeine: portion.caffeine || ''
-    });
-  }
-  const micro = snackMicroBlank();
-  for (const k of SNACK_MICRO_KEYS) micro[k] = got[k] - ref[k];
-  return { sel, macros, micro, tags, picked, custom };
-}
-function snacksToStore(sel) {
-  const out = {};
-  for (const item of FOOD.snackItems) out[item.id] = sel[item.id] || false;
-  return out;
-}
-FOOD.snackById = {};
-for (const item of FOOD.snackItems) FOOD.snackById[item.id] = item;
-/* picks: { sweetener, meal3, protein, carb }. snacks: stored map, or omitted for the default trio. */
-function foodPlate(picks, snacks) {
-  const p = picks || {};
-  const sweetener = p.sweetener === 'honey' ? 'honey' : 'maple';
-  const meal3 = p.meal3 === 'steak' ? 'steak' : 'bowl';
-  const protein = FOOD.proteins[p.protein] && p.protein !== 'steak' ? p.protein : 'mince';
-  const carb = p.carb === 'sweet' ? 'sweet' : 'rice';
-  const proteinId = meal3 === 'steak' ? 'steak' : protein;
-  const yoghurt = FOOD.sweeteners[sweetener].macros;
-  const egg = FOOD.egg.macros;
-  const third = foodAdd(foodAdd(FOOD.carbs[carb].base, FOOD.avocadoHalf), FOOD.proteins[proteinId].delta);
-  const snack = snackState(snacks);
-  const day = [yoghurt, egg, third, snack.macros].reduce(foodAdd);
-  return { sweetener, meal3, protein, carb, proteinId, yoghurt, egg, third, snack, day };
-}
-
-/* Weekly shopping checklist. ids are stable for localStorage. */
+/* Weekly shopping checklist. ids are stable for localStorage.
+   Amounts are the v4 plate x 7. Swaps replace a default; they are not extra food. */
 const SHOP = [
   { title: 'Dairy and protein', items: [
-    ['yoghurt', 'Jalna organic Farm to Pot Greek yoghurt — 2.1 kg (or other full-fat Greek / Skyr; recalculate whey)'],
-    ['whey', 'Chief unflavoured whey — 350 g'],
-    ['eggs', 'Pasture-raised eggs — 28 (2+ dozen)'],
-    ['cottage', 'Full-fat cottage cheese — 700 g'],
-    ['milk', 'Full-fat milk — 1.75 L (pasteurised organic / A2; goat or kefir = recalculate)'],
-    ['mince', 'Lean grass-fed grass-finished beef mince — 1.26 kg raw (default bowl, 180 g × 7). Buy less if you swap proteins.'],
-    ['cheddar', 'Cheddar — 140 g (Parmesan / gorgonzola ok)']
+    ['yoghurt', 'Jalna organic full-fat Greek yoghurt — 2.1 kg'],
+    ['whey', 'Chief unflavoured whey — 280 g (40 g a day)'],
+    ['eggs', 'Pasture-raised eggs — 28'],
+    ['milk', 'Whole milk — about 1.8 L (250 mL a day). Goat milk or kefir can replace it.'],
+    ['mince', 'Grass-fed beef mince, about 5% fat — 1.61 kg raw (230 g a day). Buy less if you swap the protein.'],
+    ['cheddar', 'Raw aged cheddar or raw parmesan — 210 g']
   ]},
-  { title: 'Carbs and produce', items: [
-    ['bread', 'Organic sourdough — 14 slices (2 a day, about 55–62 g each)'],
-    ['rice', 'Organic white rice — default carb, about 700 g dry (~100 g dry → 300 g cooked a day)'],
-    ['sweet', 'Orange sweet potato — carb swap for the rice (350 g cooked a day, plus peel). Not on top of a full rice week.'],
-    ['berries', 'Organic berries — 1.4 kg total (strawberries / blueberries / raspberries mix)'],
-    ['avocado', 'Avocados — 14 halves (½ with the eggs and ½ with the bowl or steak). Flesh is about 50–70 g a half.'],
-    ['broccoli', 'Broccoli — ~1.05 kg cooked drained (+ trim)'],
-    ['rocket', 'Rocket — 210 g'],
+  { title: 'Produce and carbs', items: [
+    ['bread', 'Organic long-ferment sourdough — 700 g (100 g a day)'],
+    ['rice', 'White basmati — about 910 g cooked (130 g a day). Rinse it.'],
+    ['sweet', 'Organic sweet potato — carb swap, 250 g a day, not on top of the rice'],
+    ['berries', 'Organic berries — 1.4 kg (blackberries 70 g, blueberries 50 g, strawberries 40 g, raspberries 40 g)'],
+    ['avocado', 'Avocados — 14 halves (about 70 g flesh, one at lunch and one at dinner)'],
+    ['broccoli', 'Broccoli — 1.4 kg'],
+    ['rocket', 'Organic rocket — 210 g'],
     ['onion', 'Red onion — 350 g'],
     ['carrot', 'Carrots — 700 g'],
-    ['fruit', 'Seasonal fruit — 700 g (gold kiwi in the numbers; mango, banana, apple, mandarin, orange or pineapple use this same line)'],
-    ['juice', 'Organic orange juice — 1.05 L (150 mL a day in the default snacks)']
+    ['fruit', 'Seasonal fruit — 1.4 kg. Gold kiwi is the default, two a day.'],
+    ['juice', 'Fresh orange juice — 1.75 L (250 mL a day)'],
+    ['mushrooms', 'UV vitamin D mushrooms — optional, 100 g on the days you want them']
   ]},
-  { title: 'Fats, sweeteners, extras', items: [
-    ['evoo', 'Extra virgin olive oil — 70 g (~5 Tbsp) for the model; extra cooking fat must be counted'],
-    ['maple', 'Pure maple syrup — 105 g (or the same weight of honey)'],
-    ['herbs', 'Optional, not in the numbers: Ceylon cinnamon, garlic, rosemary, thyme'],
-    ['salt', 'Salt with batch metal testing if you can find it']
+  { title: 'Fats', items: [
+    ['butter', 'Grass-fed butter — 70 g for cooking. Ghee or tallow can replace it.'],
+    ['evoo', 'Extra virgin olive oil — 140 g, for dressing only']
   ]},
-  { title: 'Snacks / optional', note: 'Not the daily base. Tick only what you are actually buying. Carrot, seasonal fruit and the 150 mL orange juice are already on the produce list.', items: [
-    ['pom', 'Organic pomegranate — optional fruit, about 100 g arils when you add it'],
-    ['snack-berries', 'Extra organic berries — another 100 g only on days you add them'],
-    ['snack-dates', 'Medjool dates — optional'],
-    ['snack-pomj', 'Pomegranate juice — optional'],
-    ['snack-cherry', 'Tart-cherry juice — optional'],
-    ['snack-kefir', 'Kefir — optional full-fat drink, not a swap for the 1.75 L milk'],
-    ['snack-xmilk', 'Extra full-fat milk — only above the 1.75 L'],
-    ['drinks', 'Bone broth, coffee, green tea, yerba mate — as tolerated'],
-    ['snack-cheese', 'Extra cheese, about 30 g a time — cheddar, Parmesan or gorgonzola, on top of the 140 g cheddar'],
-    ['snack-drizzle', 'Extra honey or maple for a drizzle — on top of the 105 g'],
-    ['snack-pollen', 'Bee pollen — optional 5–10 g. Does not close the vitamin E gap.'],
-    ['ferment', 'Sauerkraut, kimchi or fermented pickles — salty; not a vegetable swap'],
-    ['snack-ice', 'Ice cream — occasional, not a weekly staple']
+  { title: 'Also', items: [
+    ['broth', 'Beef bone broth — 1.75 L (250 mL a day)']
   ]},
-  { title: 'Stretch / swaps', note: 'Not the daily base. These replace the mince (steak replaces the whole bowl). They are not extras on top.', items: [
-    ['salmon', 'Wild-caught salmon — optional bowl swap, 180 g raw. Not a twice-weekly quota. No sardines.'],
-    ['thigh', 'Chicken thigh — optional bowl swap, 180 g raw, skinless'],
-    ['venison', 'Venison — optional bowl swap, 180 g raw'],
-    ['bison', 'Bison — optional bowl swap, 180 g raw'],
-    ['steak', 'Grass-fed grass-finished steak — 180 g raw, trimmed. Same sides as the bowl, served as a plate.'],
-    ['omega', 'Omega-3 supplement — long-chain fats on plates with no salmon'],
-    ['ghee', 'Ghee or beef tallow for cooking (count the fat)']
+  { title: 'Swaps', note: 'These replace a default. They are not extra food on top.', items: [
+    ['salmon', 'Wild salmon — protein swap, 230 g raw. No sardines.'],
+    ['chuck', 'Slow-cooked chuck — protein swap, 230 g raw'],
+    ['steak', 'Grass-fed steak — protein swap, 230 g raw'],
+    ['thigh', 'Chicken thigh — protein swap, 230 g raw'],
+    ['venison', 'Venison — protein swap, 230 g raw'],
+    ['bison', 'Bison — protein swap, 230 g raw'],
+    ['gouda', 'Aged gouda or brie — cheese swap, 30 g. A bit more K2 than cheddar.'],
+    ['ghee', 'Ghee or beef tallow — cooking-fat swap'],
+    ['kefir', 'Goat milk or kefir — milk swap'],
+    ['coconut', 'Coconut water — optional, for magnesium. Not a daily default.'],
+    ['omega', 'Omega-3 supplement — on days with no salmon']
   ]}
 ];
+
 
 const GROUP_LABEL = { explosive: 'Explosive: fast and fresh', main: 'Main lifts', muscle: 'Muscle work', finisher: 'Finisher: neck and grip' };
 

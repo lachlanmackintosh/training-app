@@ -470,3 +470,30 @@ body.ask-tight .ask-form textarea{min-height:5.6em}
 }
 .customfood{padding:12px 0;border-top:1px solid var(--line)}
 .customfood:first-of-type{border-top:0}
+.dash .mbar{margin-top:14px}
+.dash .mbar:first-child{margin-top:0}
+.mbar b{font-size:16px;font-weight:700;letter-spacing:-.02em;white-space:nowrap}
+.mbar b .muted{font-weight:600}
+.ok{color:var(--accent);font-weight:800}
+.track{height:8px;border-radius:99px;background:var(--card2);overflow:hidden;margin-top:6px}
+.track > i{display:block;height:100%;width:0;background:#667984;border-radius:99px}
+.track.hit > i{background:var(--accent)}
+.low{margin-top:12px}
+.low .sug{margin-top:4px}
+.hard{margin-top:10px}
+.hard b{font-weight:700}
+.nut{padding:8px 0}
+.irow{display:flex;align-items:center;gap:8px;padding:8px 0;border-top:1px solid var(--line)}
+.irow-name{flex:1;min-width:0}
+.gramlab{display:flex;align-items:center;gap:4px;color:var(--muted);font-size:14px;font-weight:700}
+.gram{
+  width:76px;min-height:44px;border-radius:12px;border:0;background:var(--field);color:var(--text);
+  font:600 16px/1 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+  padding:8px;text-align:right;
+}
+.foodsel{
+  display:block;width:100%;min-height:48px;margin-top:6px;border-radius:14px;border:0;
+  background:var(--card2);color:var(--text);
+  font:600 16px/1.2 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+  padding:0 12px;
+}
