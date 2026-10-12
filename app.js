@@ -657,7 +657,7 @@ function optMacroLine(o) {
   return `${comma(Math.round(n.kcal))} kcal · ${Math.round(n.protein_g)} g protein`;
 }
 function optRow(o, on, multi) {
-  return `<div class="optrow${on ? ' on' : ''}"><button type="button" class="optmain" data-act="opt-open" data-opt="${esc(o.id)}"><b>${esc(o.name)}</b><span class="muted small">${esc(optMacroLine(o))}${o.tags && (o.tags.indexOf('night') === 0 || o.tags === 'Slow cooker') ? ' · ' + esc(o.tags) : ''}</span></button>
+  return `<div class="optrow${on ? ' on' : ''}"><button type="button" class="optmain" data-act="opt-open" data-opt="${esc(o.id)}"><b>${esc(o.name)}</b><span class="muted small">${o.info && OPTS[o.id] && OPTS[o.id].meal === 'supps' ? esc(o.info.dose) : esc(optMacroLine(o))}${o.tags && (o.tags.indexOf('night') === 0 || o.tags === 'Slow cooker') ? ' · ' + esc(o.tags) : ''}</span>${o.info ? `<span class="optinfo">${esc(o.info.timing)}</span>` : ''}</button>
     <button type="button" class="optpick${on ? ' on' : ''}" data-act="${on ? 'opt-remove' : 'opt-select'}" data-opt="${esc(o.id)}" aria-label="${on ? 'Remove' : 'Select'} ${esc(o.name)}">${on ? '✓' : (multi ? '+' : '')}</button></div>`;
 }
 function slotCard(day, sl) {
@@ -700,8 +700,32 @@ function renderMeals(st) {
   const day = normaliseFoodDay(st.days && st.days[todayStr()], st.picks);
   return dashHtml(st) + `<div class="sect">Meals</div>` + (FOOD_PLAN.slots || []).map(sl => slotCard(day, sl)).join('') +
     multiCard(day, 'Snacks & drinks', FOOD_PLAN.snacks || [], 'Add as many as you have. The first three are the daily drinks.') +
-    multiCard(day, 'Supplements', FOOD_PLAN.supplements || [], 'Daily.') + logCard(day) +
+    multiCard(day, 'Supplements', FOOD_PLAN.supplements || [], 'Daily, with Meal 1. Tap for how to take.') + logCard(day) +
     `<details class="card fold" data-keep="rules"><summary>How to eat this</summary><ul class="bul small">${FOOD_PLAN.rules.map(r => `<li>${esc(r)}</li>`).join('')}</ul></details>`;
+}
+function infoHtml(info) {
+  if (!info) return '';
+  const rows = [['Dose', info.dose], ['When', info.timing], ['How', info.how], ['Limit', info.limit], ['Storage', info.store]].filter(r => r[1]);
+  return `<h3>How to take it</h3><div class="infobox">${rows.map(([k, v]) => `<div class="inforow"><span>${esc(k)}</span><b>${esc(v)}</b></div>`).join('')}${info.alt ? `<div class="infoalt">${esc(info.alt)}</div>` : ''}</div>`;
+}
+function showSheet(html, label) {
+  let el = document.getElementById('sheet');
+  if (!el) { el = document.createElement('div'); el.id = 'sheet'; el.className = 'sheet-wrap hidden'; document.body.appendChild(el); }
+  el.innerHTML = `<div class="sheet" role="dialog" aria-modal="true" aria-label="${esc(label)}"><div class="grab"></div>${html}</div>`;
+  clearTimeout(sheetTimer);
+  el.classList.remove('hidden');
+  el.querySelector('.sheet').scrollTop = 0;
+  requestAnimationFrame(() => requestAnimationFrame(() => el.classList.add('open')));
+  document.body.classList.add('sheet-on');
+}
+function openFoodRules() {
+  sheetOpt = 'rules';
+  const groups = (FOOD_PLAN.foodRules || []).map(g => `<div class="rgroup"><h3>${esc(g.title)}</h3><ul class="rlist">${g.items.map(t => {
+    const k = t.indexOf(': ');
+    return `<li>${k > 0 && k < 40 ? `<b>${esc(t.slice(0, k))}</b> ${esc(t.slice(k + 2))}` : esc(t)}</li>`;
+  }).join('')}</ul></div>`).join('');
+  showSheet(`<div class="row between"><span class="kicker">Food</span><button type="button" class="linkbtn" data-act="sheet-close">Close</button></div>
+    <h2 class="sheet-t">Food rules</h2><div class="muted small">Buy, prep, store and limits. Not absolute: weigh benefit vs risk.</div>${groups}`, 'Food rules');
 }
 let sheetOpt = '';
 let sheetTimer = 0;
@@ -720,22 +744,15 @@ function openSheet(optId) {
   const nuts = FOOD_PLAN.nutrients.map(x => ({ key: x.key, name: x.name, unit: x.unit, hard: x.hard, value: n[x.key] || 0, target: FOOD_PLAN.sillz[x.key], pct: nutrientPct(n[x.key] || 0, FOOD_PLAN.sillz[x.key]) }));
   const ings = o.items.map(it => `<div class="irow"><div class="irow-name">${esc(foodName(it.id))}</div><span class="amt">${esc(friendlyAmount(it.id, it.g))}</span></div>`).join('');
   const slotLabel = hit.meal === 'snacks' ? 'Snacks & drinks' : hit.meal === 'supps' ? 'Supplements' : slotById(hit.meal).label;
-  let el = document.getElementById('sheet');
-  if (!el) { el = document.createElement('div'); el.id = 'sheet'; el.className = 'sheet-wrap hidden'; document.body.appendChild(el); }
-  el.innerHTML = `<div class="sheet" role="dialog" aria-modal="true" aria-label="${esc(o.name)}"><div class="grab"></div>
-    <div class="row between"><span class="kicker">${esc(slotLabel)}</span><button type="button" class="linkbtn" data-act="sheet-close">Close</button></div>
+  const supp = hit.meal === 'supps';
+  showSheet(`<div class="row between"><span class="kicker">${esc(slotLabel)}</span><button type="button" class="linkbtn" data-act="sheet-close">Close</button></div>
     <h2 class="sheet-t">${esc(o.name)}</h2>
-    <div class="muted small">${comma(Math.round(n.kcal))} kcal · P ${Math.round(n.protein_g)} g · C ${Math.round(n.carbs_g)} g · F ${Math.round(n.fat_g)} g</div>
-    <div class="rings five">${macros}</div>
+    ${supp ? `<div class="muted small">${esc(o.method || '')}</div>${infoHtml(o.info)}` : `<div class="muted small">${comma(Math.round(n.kcal))} kcal · P ${Math.round(n.protein_g)} g · C ${Math.round(n.carbs_g)} g · F ${Math.round(n.fat_g)} g</div>
+    <div class="rings five">${macros}</div>${infoHtml(o.info)}
     <h3>Ingredients</h3>${ings}
-    <h3>How to prepare</h3><p class="small method">${esc(o.method || '')}</p>
+    <h3>How to prepare</h3><p class="small method">${esc(o.method || '')}</p>`}
     <h3>Micronutrients <span class="muted tiny">% of daily target</span></h3>${microGrid(nuts)}
-    <button type="button" class="btn sheetbtn" data-act="${on ? 'opt-remove' : 'opt-select'}" data-opt="${esc(optId)}" data-close="1">${on ? 'Remove from today' : 'Select'}</button></div>`;
-  clearTimeout(sheetTimer);
-  el.classList.remove('hidden');
-  el.querySelector('.sheet').scrollTop = 0;
-  requestAnimationFrame(() => requestAnimationFrame(() => el.classList.add('open')));
-  document.body.classList.add('sheet-on');
+    <button type="button" class="btn sheetbtn" data-act="${on ? 'opt-remove' : 'opt-select'}" data-opt="${esc(optId)}" data-close="1">${on ? 'Remove from today' : 'Select'}</button>`, o.name);
 }
 function closeSheet() {
   sheetOpt = '';
@@ -758,7 +775,7 @@ function paintMealChecks() {
 }
 function renderFood() {
   const st = foodState();
-  view().innerHTML = `<h1>Food</h1>
+  view().innerHTML = `<div class="row between"><h1>Food</h1><button type="button" class="rulesbtn" data-act="food-rules">Rules</button></div>
     <div class="muted small">Morning snack, then Meals 1, 2 and 3. Today against your targets.</div>
     ${renderMeals(st)}`;
   paintMealChecks();
@@ -923,6 +940,7 @@ document.addEventListener('click', e => {
   else if (act === 'mob-prev') { unlockAudio(); pPrev(); }
   else if (act === 'opt-open') openSheet(b.dataset.opt);
   else if (act === 'sheet-close') closeSheet();
+  else if (act === 'food-rules') openFoodRules();
   else if (act === 'opt-select' || act === 'opt-remove') {
     const op = act === 'opt-select' ? 'select_option' : 'unselect_option';
     const applied = applyFoodActions(foodState(), [{ op, option: b.dataset.opt }], todayStr());
