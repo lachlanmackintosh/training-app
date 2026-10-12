@@ -497,3 +497,28 @@ body.ask-tight .ask-form textarea{min-height:5.6em}
   font:600 16px/1.2 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
   padding:0 12px;
 }
+
+/* ---------- Food v6: rings, options, sheet, gaps ---------- */
+.rings{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;margin:12px 0 4px;text-align:center}
+.ring{position:relative;min-width:0}
+.ring svg{width:100%;max-width:64px;height:auto;transform:rotate(-90deg)}
+.ring .rb{fill:none;stroke:var(--card2);stroke-width:6}
+.ring .rf{fill:none;stroke:var(--accent);stroke-width:6;stroke-linecap:round;transition:stroke-dashoffset .4s}
+.ring.hit .rf{stroke:var(--good)}
+.ring-in{position:absolute;left:0;right:0;top:0;aspect-ratio:1;max-width:64px;margin:0 auto;display:flex;align-items:center;justify-content:center;font-size:12px}
+.ring-l{font-size:12px;font-weight:600;margin-top:2px}
+.ring-v{font-size:10.5px;line-height:1.2}
+.optrow{display:flex;align-items:stretch;gap:8px;margin-top:8px;border:1px solid var(--line);border-radius:14px;background:var(--card2)}
+.optrow.on{border-color:var(--accent-line);background:var(--accent-soft)}
+.optmain{flex:1;min-width:0;text-align:left;background:none;border:0;color:var(--text);padding:10px 12px;display:flex;flex-direction:column;gap:2px;font:inherit;cursor:pointer}
+.optpick{width:48px;flex:none;border:0;border-left:1px solid var(--line);background:none;color:var(--accent);font-size:20px;cursor:pointer;border-radius:0 14px 14px 0}
+.optpick.on{background:var(--accent);color:var(--accent-ink);font-weight:700}
+.gaps .gapchips{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0 4px}
+.gapchip{font-size:12px;padding:3px 9px;border-radius:999px;background:var(--accent-soft);color:var(--accent)}
+.gapchip.hard{background:rgba(224,177,92,.14);color:var(--warn)}
+.sheet-wrap{position:fixed;inset:0;z-index:60;background:rgba(0,0,0,.55);display:flex;align-items:flex-end;justify-content:center}
+.sheet-wrap.hidden{display:none}
+.sheet{width:100%;max-width:560px;max-height:88vh;overflow:auto;background:var(--card);border-radius:20px 20px 0 0;padding:16px 16px calc(20px + var(--safe-b));border-top:1px solid var(--accent-line)}
+.sheet h3{margin:16px 0 4px;font-size:15px}
+.sheetbtn{width:100%;margin-top:14px}
+body.sheet-on{overflow:hidden}

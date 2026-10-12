@@ -630,97 +630,119 @@ function trackBar(pct, hit) {
   const w = Math.max(0, Math.min(100, Number(pct) || 0));
   return `<div class="track${hit ? ' hit' : ''}" role="img" aria-label="${w} percent"><i style="width:${w}%"></i></div>`;
 }
+function ringHtml(b) {
+  const pct = Math.max(0, Number(b.pct) || 0), r = 26, c = 2 * Math.PI * r, off = c * (1 - Math.min(100, pct) / 100);
+  const val = b.key === 'kcal' ? comma(Math.round(b.value)) : String(Math.round(b.value));
+  return `<div class="ring${pct >= 100 ? ' hit' : ''}"><svg viewBox="0 0 64 64" aria-hidden="true"><circle cx="32" cy="32" r="${r}" class="rb"/><circle cx="32" cy="32" r="${r}" class="rf" stroke-dasharray="${c.toFixed(1)}" stroke-dashoffset="${off.toFixed(1)}"/></svg>
+    <div class="ring-in"><b>${pct}%</b></div><div class="ring-l">${esc(b.name)}</div><div class="ring-v muted">${val}${b.unit ? ' ' + esc(b.unit) : ''} / ${b.key === 'kcal' ? comma(b.target) : b.target}</div></div>`;
+}
+function nutRows(nuts) {
+  return nuts.map(n => `<div class="nut"><div class="row between"><span>${esc(n.name)}${n.hard ? ' <span class="muted small">known gap</span>' : ''}</span><span class="muted">${esc(formatAmount(n.value))} ${esc(n.unit)} · ${n.pct}%${n.pct >= 100 ? ' <span class="ok">✓</span>' : ''}</span></div>${trackBar(n.pct, n.pct >= 100)}</div>`).join('');
+}
 function dashHtml(st) {
   const d = dayReport(st, todayStr());
-  const macros = d.macroBars.map(b => {
-    const val = b.key === 'kcal' ? comma(Math.round(b.value)) : String(Math.round(b.value));
-    const tgt = b.key === 'kcal' ? comma(b.target) : String(b.target);
-    const unit = b.unit ? ' ' + b.unit : '';
-    return `<div class="mbar"><div class="row between"><span>${esc(b.name)}</span><b>${val}<span class="muted"> / ${tgt}${esc(unit)}</span>${b.hit ? ' <span class="ok">✓</span>' : ''}</b></div>${trackBar(b.pct, b.hit)}</div>`;
-  }).join('');
-  const hard = d.hasLog ? d.hard.filter(h => !h.hit).map(h => `<div class="hard"><b>${esc(h.name)} · ${h.pct}%</b><div class="muted small">${esc(h.note)}</div></div>`).join('') : '';
-  const hardBlock = hard ? `<div class="picklabel">Known gaps</div>${hard}` : '';
-  let low = '';
-  if (!d.hasLog) low = '<p class="muted small" style="margin:14px 0 0">Nothing logged yet. Tick a meal, or tell Ask AI what you ate.</p>';
-  else if (d.lows.length) {
-    low = '<div class="picklabel">Low today</div>' + d.lows.map(n => {
-      const sug = n.suggestions.map(s => esc(s.label)).join(' · ');
-      return `<div class="low"><div class="row between"><b>${esc(n.name)}</b><span class="muted">${n.pct}%</span></div>${trackBar(n.pct, false)}${sug ? `<div class="muted small sug">${sug}</div>` : ''}</div>`;
-    }).join('');
-  } else low = '<p class="muted small" style="margin:14px 0 0">Sillz targets you can hit with food are covered.</p>';
-  const all = d.nutrients.map(n => `<div class="nut"><div class="row between"><span>${esc(n.name)}</span><span class="muted">${esc(formatAmount(n.value))} ${esc(n.unit)} · ${n.pct}%${n.hit ? ' <span class="ok">✓</span>' : ''}</span></div>${trackBar(n.pct, n.hit)}</div>`).join('');
+  const rings = `<div class="rings">${d.macroBars.map(ringHtml).join('')}</div>`;
   const est = d.estimate ? '<div class="muted small" style="margin-top:8px">Totals include an estimate.</div>' : '';
-  return `<div class="card dash">${macros}${est}${hardBlock}${low}<details class="fold" data-keep="nuts"><summary>All nutrients</summary>${all}</details></div>`;
+  const empty = d.hasLog ? '' : '<p class="muted small" style="margin:10px 0 0">Nothing selected yet. Pick your meals below, or tell Ask AI what you ate.</p>';
+  return `<div class="card dash"><div class="row between"><b class="kicker">Today</b><span class="muted small">${d.nutrients.filter(n => n.pct >= 100).length} of ${d.nutrients.length} micros hit</span></div>${rings}${est}${empty}
+    <details class="fold" data-keep="nuts"${d.hasLog ? ' open' : ''}><summary>Micronutrients (% of target)</summary>${nutRows(d.nutrients)}</details></div>${gapsHtml(d)}`;
+}
+function gapsHtml(d) {
+  if (!d.hasLog) return '';
+  const g = d.gaps || { gaps: [], ideas: [] };
+  if (!g.gaps.length) return '<div class="card gaps"><b class="kicker">Close the gaps</b><p class="muted small" style="margin:6px 0 0">Everything is at 100% or more. Nice.</p></div>';
+  const chips = g.gaps.map(x => `<span class="gapchip${x.hard ? ' hard' : ''}">${esc(x.name)} ${x.pct}%</span>`).join('');
+  const ideas = g.ideas.map(i => `<div class="irow"><div class="irow-name"><b>${esc(i.label)}</b><div class="muted small">${i.fixes ? 'Closes ' + i.fixes + ' · ' : ''}${esc(i.names.join(', '))}</div></div>${i.kind === 'option' ? `<button type="button" class="linkbtn" data-act="opt-select" data-opt="${esc(i.id)}">Add</button>` : `<button type="button" class="linkbtn" data-act="bump-add" data-bump="${esc(i.id)}">Add</button>`}</div>`).join('');
+  const note = g.gaps.some(x => x.key === 'K2_ug') ? `<div class="muted small" style="margin-top:6px">${esc(FOOD_PLAN.hardNotes.K2_ug || '')}</div>` : '';
+  return `<div class="card gaps"><b class="kicker">Close the gaps</b><div class="gapchips">${chips}</div>${ideas || '<div class="muted small">No single snack moves these much.</div>'}${note}</div>`;
+}
+function optMacroLine(o) {
+  const n = optionNutrients(o);
+  return `${comma(Math.round(n.kcal))} kcal · ${Math.round(n.protein_g)} g protein`;
+}
+function optRow(o, on, multi) {
+  return `<div class="optrow${on ? ' on' : ''}"><button type="button" class="optmain" data-act="opt-open" data-opt="${esc(o.id)}"><b>${esc(o.name)}</b><span class="muted small">${esc(optMacroLine(o))}${o.tags && o.tags.indexOf('night') === 0 ? ' · ' + esc(o.tags) : ''}</span></button>
+    <button type="button" class="optpick${on ? ' on' : ''}" data-act="${on ? 'opt-remove' : 'opt-select'}" data-opt="${esc(o.id)}" aria-label="${on ? 'Remove' : 'Select'} ${esc(o.name)}">${on ? '✓' : (multi ? '+' : '○')}</button></div>`;
+}
+function slotCard(day, sl) {
+  const sel = day.sel && day.sel[sl.id];
+  const tonight = sl.id === 'bowl' ? defaultOption('bowl', todayStr()) : '';
+  const opts = sl.options.map(o => optRow(o, o.id === sel, false)).join('');
+  const sub = sel ? 'Selected: ' + optionById(sel).name : (tonight ? 'Tonight on the rotation: ' + optionById(tonight).name : 'Pick one');
+  return `<div class="card"><div class="row between"><h3 style="margin:0">${esc(sl.label)}</h3><span class="muted small">${esc(sl.short)}</span></div><div class="muted small">${esc(sub)}</div>${opts}</div>`;
+}
+function multiCard(day, title, list, sub) {
+  const rows = list.map(o => optRow(o, day.items.some(i => i.opt === o.id), true)).join('');
+  return `<div class="card"><h3 style="margin:0">${esc(title)}</h3><div class="muted small">${esc(sub)}</div>${rows}</div>`;
 }
 function foodNote(id) {
   const food = FOOD_PLAN.library[id];
   return food && food.note ? food.note : '';
 }
-function itemLine(day, meal, it) {
-  const line = day.items.find(x => x.meal === meal.id && x.id === it.id);
-  const name = foodName(it.id);
-  const note = foodNote(it.id);
-  if (isSkipped(day, meal.id, it.id) && !line) {
-    return `<div class="irow"><div class="irow-name"><b>${esc(name)}</b><div class="muted small">Skipped</div></div><button type="button" class="linkbtn" data-act="log-add" data-meal="${esc(meal.id)}" data-id="${esc(it.id)}">Add</button></div>`;
-  }
-  if (!line) {
-    return `<div class="irow"><div class="irow-name"><b>${esc(name)}</b>${note ? `<div class="muted small">${esc(note)}</div>` : ''}</div><span class="muted">${it.g} g</span></div>`;
-  }
-  return `<div class="irow"><div class="irow-name"><b>${esc(name)}</b>${note ? `<div class="muted small">${esc(note)}</div>` : ''}</div>
-    <label class="gramlab"><input class="gram" type="number" inputmode="numeric" min="1" max="2500" step="1" data-grams="${esc(line.uid)}" value="${line.g}" aria-label="${esc(name)} grams"><span>g</span></label>
-    <button type="button" class="linkbtn" data-act="log-del" data-uid="${esc(line.uid)}">Remove</button></div>`;
-}
-function swapFields(meal, picks) {
-  const slots = [];
-  for (const it of meal.items) if (it.slot && slots.indexOf(it.slot) === -1) slots.push(it.slot);
-  return slots.map(slot => {
-    const sw = FOOD_PLAN.swaps[slot];
-    const opts = sw.ids.map(id => `<option value="${esc(id)}"${id === picks[slot] ? ' selected' : ''}>${esc(foodName(id))}</option>`).join('');
-    return `<label class="picklabel">${esc(sw.label)}<select class="foodsel" data-swap="${esc(slot)}">${opts}</select></label>`;
-  }).join('');
-}
-function mealCard(st, day, meal) {
-  const plan = resolveMeal(meal, st.picks);
-  const state = mealTickState(day, meal, st.picks);
-  const logged = day.items.filter(i => i.meal === meal.id);
-  const basis = logged.length ? logged : plan.items.map(it => ({ id: it.id, g: it.g }));
-  const nut = sumNutrients(basis.map(itemNutrients));
-  const label = logged.length ? 'Logged' : 'Planned';
-  const when = plan.when ? ` <span class="muted">${esc(plan.when)}</span>` : '';
-  const rows = plan.items.map(it => itemLine(day, meal, it)).join('');
-  let mush = '';
-  if (meal.id === 'egg') {
-    const line = day.items.find(i => i.id === 'uv_mushrooms' && i.meal === 'egg');
-    const on = !!line || (st.picks.mushrooms && !isSkipped(day, 'egg', 'uv_mushrooms'));
-    const grams = line
-      ? `<label class="gramlab"><input class="gram" type="number" inputmode="numeric" min="1" max="2500" step="1" data-grams="${esc(line.uid)}" value="${line.g}" aria-label="Mushroom grams"><span>g</span></label>`
-      : '';
-    mush = `<label class="todaytick"><input type="checkbox" data-mush="1"${on ? ' checked' : ''}><span>UV mushrooms <span class="muted">optional</span></span></label>${grams ? `<div class="irow"><div class="irow-name"><span class="muted small">${esc(foodNote('uv_mushrooms') || 'Vitamin D')}</span></div>${grams}</div>` : ''}`;
-  }
-  return `<div class="card"><label class="todaytick"><input type="checkbox" data-meal="${esc(meal.id)}" data-state="${state}"><span><b>${esc(plan.name)}</b>${when}</span></label>
-    <div class="muted small">${label} ${comma(Math.round(nut.kcal))} kcal · ${Math.round(nut.protein_g)} g protein</div>
-    <details class="fold" data-keep="meal-${esc(meal.id)}"><summary>Items and swaps</summary>${rows}${mush}${swapFields(meal, st.picks)}</details></div>`;
-}
-function addedCard(day) {
-  const extra = day.items.filter(i => !i.meal);
-  if (!extra.length) return '';
-  const rows = extra.map(item => {
+function unitOf(id) { return (FOOD_PLAN.library[id] && FOOD_PLAN.library[id].unit) || 'g'; }
+function logCard(day) {
+  if (!day.items.length) return '';
+  const label = it => {
+    if (it.opt && optionById(it.opt)) return optionById(it.opt).name;
+    const sl = (FOOD_PLAN.slots || []).find(s => s.id === it.meal);
+    return sl ? sl.label : (it.meal === 'snacks' ? 'Snacks' : it.meal === 'supps' ? 'Supplements' : 'Added');
+  };
+  const rows = day.items.map(item => {
     const name = item.estimate ? item.name : foodName(item.id);
     const badge = item.estimate ? '<span class="estimate">Estimate</span>' : '';
+    const sub = `<div class="muted small">${esc(label(item))}</div>`;
     if (item.flat) {
       const kcal = item.tot && item.tot.kcal ? Math.round(item.tot.kcal) : 0;
       return `<div class="irow"><div class="irow-name"><b>${esc(name)}${badge}</b><div class="muted small">About ${comma(kcal)} kcal</div></div><button type="button" class="linkbtn" data-act="log-del" data-uid="${esc(item.uid)}">Remove</button></div>`;
     }
-    return `<div class="irow"><div class="irow-name"><b>${esc(name)}${badge}</b></div>
-      <label class="gramlab"><input class="gram" type="number" inputmode="numeric" min="1" max="2500" step="1" data-grams="${esc(item.uid)}" value="${item.g}" aria-label="${esc(name)} grams"><span>g</span></label>
+    const u = item.estimate ? 'g' : unitOf(item.id);
+    return `<div class="irow"><div class="irow-name"><b>${esc(name)}${badge}</b>${sub}</div>
+      <label class="gramlab"><input class="gram" type="number" inputmode="numeric" min="1" max="2500" step="1" data-grams="${esc(item.uid)}" value="${item.g}" aria-label="${esc(name)} amount"><span>${esc(u)}</span></label>
       <button type="button" class="linkbtn" data-act="log-del" data-uid="${esc(item.uid)}">Remove</button></div>`;
   }).join('');
-  return `<div class="card"><h3>Added</h3><div class="muted small">Not part of a ticked meal. Estimates are marked.</div>${rows}</div>`;
+  return `<details class="card fold" data-keep="log"><summary>Today's log (${day.items.length} foods)</summary><div class="muted small">Selections and Ask AI entries. Edit amounts here.</div>${rows}</details>`;
 }
 function renderMeals(st) {
   const day = normaliseFoodDay(st.days && st.days[todayStr()], st.picks);
-  return dashHtml(st) + FOOD_PLAN.meals.map(m => mealCard(st, day, m)).join('') + addedCard(day) +
+  return dashHtml(st) + (FOOD_PLAN.slots || []).map(sl => slotCard(day, sl)).join('') +
+    multiCard(day, 'Snacks & drinks', FOOD_PLAN.snacks || [], 'Add as many as you have. The first four are the daily drinks.') +
+    multiCard(day, 'Supplements', FOOD_PLAN.supplements || [], 'Daily.') + logCard(day) +
     `<details class="card fold" data-keep="rules"><summary>How to eat this</summary><ul class="bul small">${FOOD_PLAN.rules.map(r => `<li>${esc(r)}</li>`).join('')}</ul></details>`;
+}
+let sheetOpt = '';
+function openSheet(optId) {
+  const o = optionById(optId);
+  if (!o) return;
+  sheetOpt = optId;
+  const hit = OPTS[optId];
+  const st = foodState();
+  const day = normaliseFoodDay(st.days && st.days[todayStr()], st.picks);
+  const on = hit.meal === 'snacks' || hit.meal === 'supps' ? day.items.some(i => i.opt === optId) : (day.sel && day.sel[hit.meal]) === optId;
+  const n = optionNutrients(o);
+  const T = FOOD_PLAN.targets;
+  const macros = [['kcal', 'Calories', n.kcal, T.kcal, ''], ['p', 'Protein', n.protein_g, T.protein, 'g'], ['c', 'Carbs', n.carbs_g, T.carbs, 'g'], ['f', 'Fat', n.fat_g, T.fat, 'g'], ['fib', 'Fibre', n.fibre_g, T.fibre, 'g']]
+    .map(([key, name, value, target, unit]) => ringHtml({ key, name, value, target, unit, pct: nutrientPct(value, target) })).join('');
+  const nuts = FOOD_PLAN.nutrients.map(x => ({ key: x.key, name: x.name, unit: x.unit, hard: x.hard, value: n[x.key] || 0, pct: nutrientPct(n[x.key] || 0, FOOD_PLAN.sillz[x.key]) }));
+  const ings = o.items.map(it => `<div class="irow"><div class="irow-name"><b>${esc(foodName(it.id))}</b></div><span class="muted">${it.g} ${esc(unitOf(it.id))}</span></div>`).join('');
+  const slotLabel = hit.meal === 'snacks' ? 'Snacks & drinks' : hit.meal === 'supps' ? 'Supplements' : slotById(hit.meal).label;
+  let el = document.getElementById('sheet');
+  if (!el) { el = document.createElement('div'); el.id = 'sheet'; el.className = 'sheet-wrap'; document.body.appendChild(el); }
+  el.innerHTML = `<div class="sheet" role="dialog" aria-modal="true" aria-label="${esc(o.name)}">
+    <div class="row between"><span class="kicker">${esc(slotLabel)}</span><button type="button" class="linkbtn" data-act="sheet-close">Close</button></div>
+    <h2 style="margin:4px 0 10px">${esc(o.name)}</h2>
+    <div class="rings">${macros}</div>
+    <h3>Ingredients</h3>${ings}
+    <h3>How to prepare</h3><p class="small">${esc(o.method || '')}</p>
+    <details class="fold" open><summary>Micronutrients (% of daily target)</summary>${nutRows(nuts)}</details>
+    <button type="button" class="btn sheetbtn" data-act="${on ? 'opt-remove' : 'opt-select'}" data-opt="${esc(optId)}" data-close="1">${on ? 'Remove from today' : 'Select'}</button></div>`;
+  el.classList.remove('hidden');
+  document.body.classList.add('sheet-on');
+}
+function closeSheet() {
+  sheetOpt = '';
+  const el = document.getElementById('sheet');
+  if (el) el.classList.add('hidden');
+  document.body.classList.remove('sheet-on');
 }
 let paintingMeals = false;
 function paintMealChecks() {
@@ -735,7 +757,7 @@ function renderFood(arg) {
   const mode = arg === 'shop' ? 'shop' : 'meals';
   const st = foodState();
   view().innerHTML = `<h1>Food</h1>
-    <div class="muted small">Today against the Sillz targets.</div>
+    <div class="muted small">Pick a breakfast, lunch and dinner. Today against your targets.</div>
     ${mode === 'meals' ? askBarHtml(true) : ''}
     ${foodSeg(mode)}
     ${mode === 'shop' ? renderShop() : renderMeals(st)}`;
@@ -1259,6 +1281,15 @@ document.addEventListener('click', e => {
   else if (act === 'hiit-skip') { unlockAudio(); pNext(false); }
   else if (act === 'mob-prev') { unlockAudio(); pPrev(); }
   else if (act === 'food-view') go(b.dataset.v === 'shop' ? '#/food/shop' : '#/food');
+  else if (act === 'opt-open') openSheet(b.dataset.opt);
+  else if (act === 'sheet-close') closeSheet();
+  else if (act === 'opt-select' || act === 'opt-remove') {
+    const op = act === 'opt-select' ? 'select_option' : 'unselect_option';
+    const applied = applyFoodActions(foodState(), [{ op, option: b.dataset.opt }], todayStr());
+    if (applied.changed) { saveFood(applied.state); toast(applied.changes[0]); }
+    if (b.dataset.close) closeSheet();
+    refreshFoodViews();
+  }
   else if (act === 'log-add') {
     const applied = applyFoodActions(foodState(), [{ op: 'add', id: b.dataset.id, meal: b.dataset.meal }], todayStr());
     if (applied.changed) saveFood(applied.state);
@@ -1318,6 +1349,7 @@ document.addEventListener('submit', e => {
   sendAsk(text);
 });
 document.addEventListener('keydown', e => {
+  if (e.key === 'Escape' && sheetOpt) { closeSheet(); return; }
   if (e.key === 'Escape' && !$('#ask').classList.contains('hidden')) { closeAsk(); return; }
   if (e.key === 'Enter' && e.target.id === 'ask-input' && !e.shiftKey) {
     e.preventDefault();
@@ -1327,6 +1359,7 @@ document.addEventListener('keydown', e => {
   }
 });
 $('#ask').addEventListener('click', e => { if (e.target.id === 'ask') closeAsk(); });
+document.addEventListener('click', e => { if (e.target && e.target.id === 'sheet') closeSheet(); });
 const askBox = $('#ask-input');
 if (askBox) {
   const editDictation = () => { if (aiListening) endListen(); fitAskSheet(); };

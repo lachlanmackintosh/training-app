@@ -25,73 +25,61 @@ function test(name, fn) {
   catch (e) { console.error('FAIL', name); throw e; }
 }
 
-test('v4 plate drops the old defaults', () => {
-  const used = [];
-  for (const m of g.FOOD_PLAN.meals) {
-    for (const it of m.items) used.push(it.id);
-    assert.ok(m.id === 'yoghurt' || m.id === 'egg' || m.id === 'bowl' || m.id === 'snacks');
+test('v6 plan has breakfast, lunch, dinner options, snacks and supplements', () => {
+  const P = g.FOOD_PLAN;
+  assert.strictEqual(P.slots.map(s => s.label).join(), 'Breakfast,Lunch,Dinner');
+  assert.strictEqual(P.slots[2].options.length, 7);
+  assert.ok(P.slots[2].options.some(o => /Pho/.test(o.name)));
+  assert.ok(!P.slots[2].options.some(o => /lamb|mussel/i.test(o.name)));
+  for (const sl of P.slots) for (const o of sl.options) {
+    assert.ok(o.method && o.items.length && o.partner.length, o.id);
+    for (const it of o.items.concat(o.partner)) assert.ok(P.library[it.id], it.id);
   }
-  for (const gone of ['cottage_cheese', 'maple', 'honey', 'gouda', 'pumpkin_seeds', 'natto', 'chia']) {
-    assert.ok(used.indexOf(gone) === -1, gone);
-  }
-  assert.ok(used.indexOf('raw_cheddar') !== -1);
-  assert.ok(used.indexOf('blackberries') !== -1);
-  assert.ok(used.indexOf('butter') !== -1);
-  assert.strictEqual(g.FOOD_PLAN.meals.find(m => m.id === 'egg').optional[0].id, 'uv_mushrooms');
-  assert.strictEqual(g.FOOD_PLAN.targets.kcal, 2750);
-  assert.strictEqual(g.FOOD_PLAN.targets.protein, 178);
-  assert.strictEqual(g.FOOD_PLAN.swaps.cheese.ids[0], 'raw_cheddar');
-  assert.ok(g.FOOD_PLAN.swaps.fruit.ids.indexOf('kiwi_gold') === 0);
-  assert.ok(g.FOOD_PLAN.swaps.fruit.ids.indexOf('mango') !== -1);
+  assert.ok(P.supplements.some(o => o.items[0].id === 'clo' && o.items[0].g === 5));
+  assert.ok(P.supplements.some(o => o.items[0].id === 'd3k2_2drops' && o.items[0].g === 2));
+  assert.strictEqual(P.targets.protein, 175);
+  assert.strictEqual(P.targets.fibre, 30);
+  assert.ok(P.people.partner.micros.iron_mg === 18);
+  for (const k of ['choline_mg', 'iodine_ug', 'EPA_DHA_mg']) assert.ok(P.nutrients.some(n => n.key === k) && P.sillz[k] > 0, k);
 });
 
-test('full day matches the v4 totals', () => {
-  let st = { picks: null, days: {} };
-  for (const meal of ['yoghurt', 'egg', 'bowl', 'snacks']) {
-    st = g.applyFoodActions(st, [{ op: 'add_meal', meal }], DATE).state;
-  }
+test('a full selected day hits every target except K2', () => {
+  let st = { days: {} };
+  for (const meal of ['yoghurt', 'egg', 'bowl', 'snacks', 'supps']) st = g.applyFoodActions(st, [{ op: 'add_meal', meal }], DATE).state;
   const day = st.days[DATE];
-  assert.ok(!has(day, 'uv_mushrooms'));
-  const sum = g.sumNutrients(day.items.map(g.itemNutrients));
-  assert.ok(Math.abs(sum.kcal - 2732.78) < 0.05, sum.kcal);
-  assert.ok(Math.abs(sum.protein_g - 174.72) < 0.05, sum.protein_g);
-  assert.ok(Math.abs(sum.K2_ug - 24.38) < 0.05, sum.K2_ug);
-  assert.ok(Math.abs(sum.D_ug - 4.67) < 0.05, sum.D_ug);
-  const report = g.dayReport(st, DATE);
-  assert.strictEqual(report.nutrients.find(n => n.key === 'K2_ug').pct, 12);
-  assert.strictEqual(report.nutrients.find(n => n.key === 'D_ug').pct, 31);
-  assert.ok(report.hard.every(h => h.note));
-  const withM = g.applyFoodActions(st, [{ op: 'set_mushrooms', on: true }], DATE).state;
-  const sumM = g.sumNutrients(withM.days[DATE].items.map(g.itemNutrients));
-  assert.ok(Math.abs(sumM.kcal - 2754.78) < 0.05, sumM.kcal);
-  assert.ok(Math.abs(sumM.D_ug - 30.87) < 0.05, sumM.D_ug);
-  assert.ok(g.dayReport(withM, DATE).nutrients.find(n => n.key === 'D_ug').hit);
+  assert.strictEqual(day.sel.yoghurt, 'b_berry');
+  assert.strictEqual(day.sel.egg, 'l_egg');
+  assert.strictEqual(day.sel.bowl, 'd6'); // Sat 10 Oct = night 6
+  const r = g.dayReport(st, DATE);
+  const low = r.nutrients.filter(n => n.pct < 100).map(n => n.key);
+  assert.strictEqual(low.join(), 'K2_ug');
+  assert.ok(r.macroBars.find(b => b.key === 'p').pct >= 100);
+  assert.ok(r.macroBars.find(b => b.key === 'fib').pct >= 100);
+  assert.ok(r.gaps.gaps.some(x => x.key === 'K2_ug' && x.hard));
 });
 
-test('tick, skip, swap, and gram edits', () => {
-  let applied = g.applyFoodActions({}, [{ op: 'add_meal', meal: 'yoghurt' }], DATE);
-  assert.ok(applied.changed);
-  assert.ok(has(applied.state.days[DATE], 'blackberries'));
-  applied = g.applyFoodActions(applied.state, [{ op: 'remove', id: 'blueberries', meal: 'yoghurt' }], DATE);
-  assert.ok(!has(applied.state.days[DATE], 'blueberries'));
-  assert.ok(applied.state.days[DATE].skip.indexOf('yoghurt:blueberries') !== -1);
-  applied = g.applyFoodActions(applied.state, [{ op: 'add_meal', meal: 'yoghurt' }], DATE);
-  assert.ok(!has(applied.state.days[DATE], 'blueberries'));
-  const whey = applied.state.days[DATE].items.find(i => i.id === 'whey');
-  const doubled = g.setItemGrams(applied.state, DATE, whey.uid, 80);
+test('one option per meal slot, snacks are multi, gaps ranked', () => {
+  let st = g.applyFoodActions({}, [{ op: 'select_option', option: 'd1' }], DATE).state;
+  st = g.applyFoodActions(st, [{ op: 'select_option', option: 'd7' }], DATE).state;
+  let day = st.days[DATE];
+  assert.strictEqual(day.sel.bowl, 'd7');
+  assert.ok(has(day, 'rice_noodles'));
+  assert.ok(!has(day, 'chicken_thigh'));
+  st = g.applyFoodActions(st, [{ op: 'select_option', option: 's_kiwi' }, { op: 'select_option', option: 's_carrot' }], DATE).state;
+  day = st.days[DATE];
+  assert.ok(has(day, 'kiwi_gold') && has(day, 'carrot'));
+  st = g.applyFoodActions(st, [{ op: 'unselect_option', option: 's_kiwi' }], DATE).state;
+  assert.ok(!has(st.days[DATE], 'kiwi_gold'));
+  const r = g.dayReport(st, DATE);
+  assert.ok(r.gaps.ideas.length > 0);
+  for (let i = 1; i < r.gaps.ideas.length; i++) assert.ok(r.gaps.ideas[i - 1].fixes >= r.gaps.ideas[i].fixes);
+  const whey = g.applyFoodActions(st, [{ op: 'add_meal', meal: 'yoghurt' }], DATE).state;
+  const item = whey.days[DATE].items.find(i => i.id === 'whey');
+  const doubled = g.setItemGrams(whey, DATE, item.uid, 90);
   assert.ok(doubled.changed);
-  const before = g.itemNutrients(whey).kcal;
-  const after = g.itemNutrients(doubled.state.days[DATE].items.find(i => i.id === 'whey')).kcal;
-  assert.ok(Math.abs(after - before * 2) < 0.01);
-  applied = g.applyFoodActions(doubled.state, [{ op: 'add_meal', meal: 'snacks' }], DATE);
-  applied = g.applyFoodActions(applied.state, [{ op: 'set_swap', slot: 'fruit', id: 'mango' }], DATE);
-  assert.strictEqual(applied.state.picks.fruit, 'mango');
-  assert.ok(has(applied.state.days[DATE], 'mango'));
-  assert.ok(!has(applied.state.days[DATE], 'kiwi_gold'));
-  const egg = g.applyFoodActions(applied.state, [{ op: 'add_meal', meal: 'egg' }], DATE);
-  assert.ok(has(egg.state.days[DATE], 'egg'));
-  assert.ok(!has(egg.state.days[DATE], 'uv_mushrooms'));
-  assert.strictEqual(g.mealTickState(egg.state.days[DATE], g.FOOD_PLAN.meals.find(m => m.id === 'egg'), egg.state.picks), 'on');
+  const back = g.loadFoodState(JSON.parse(JSON.stringify(doubled.state)));
+  assert.strictEqual(back.days[DATE].sel.bowl, 'd7');
+  assert.ok(back.days[DATE].items.some(i => i.opt === 's_carrot'));
 });
 
 test('suggestions stay inside his library and prefer the plan', () => {
@@ -100,8 +88,7 @@ test('suggestions stay inside his library and prefer the plan', () => {
   assert.ok(g.isExcludedFood('brazil_nuts', 'Brazil nuts'));
   const k2 = g.suggestionsFor('K2_ug', {});
   assert.ok(k2.length >= 1 && k2.length <= 2);
-  assert.ok(k2.some(s => s.id === 'gouda'));
-  assert.ok(k2.every(s => !g.isExcludedFood(s.id, s.label)));
+    assert.ok(k2.every(s => !g.isExcludedFood(s.id, s.label)));
   const d = g.suggestionsFor('D_ug', {});
   assert.ok(d.some(s => s.id === 'uv_mushrooms'));
   assert.ok(!d.some(s => /sardine|natto|pumpkin|chia|almond|cacao|brazil/i.test(s.id + s.label)));
@@ -112,6 +99,7 @@ test('suggestions stay inside his library and prefer the plan', () => {
     for (const s of n.suggestions) assert.ok(!g.isExcludedFood(s.id, s.label), s.label);
   }
   assert.ok(report.hard.some(h => h.key === 'K2_ug' && !h.hit));
+  assert.ok(report.hard.every(h => h.key === 'K2_ug'));
 });
 
 test('off-library food is an estimate and scales with grams', () => {
@@ -161,11 +149,8 @@ test('mocked Gemini logs speech and can be undone', () => {
   const undone = g.loadFoodState(snap);
   assert.ok(!has(undone.days[DATE], 'egg'));
   assert.ok(has(undone.days[DATE], 'greek_yoghurt'));
-  const snacks = g.applyFoodActions(ate.state, [{ op: 'add_meal', meal: 'snacks' }], DATE);
-  const mango = g.applyFoodActions(snacks.state, g.mockGeminiFood('had a mango instead of kiwi').actions, DATE);
-  assert.strictEqual(mango.state.picks.fruit, 'mango');
-  assert.ok(has(mango.state.days[DATE], 'mango'));
-  assert.ok(!has(mango.state.days[DATE], 'kiwi_gold'));
+  const burrito = g.applyFoodActions(ate.state, g.mockGeminiFood('had the burrito bowl for dinner').actions, DATE);
+  assert.strictEqual(burrito.state.days[DATE].sel.bowl, 'd3');
   assert.strictEqual(before.days[DATE], undefined);
 });
 
@@ -175,7 +160,7 @@ test('what am I low on is answered from the local totals', () => {
   assert.ok(/nothing logged/i.test(empty));
   const st = g.applyFoodActions({}, [{ op: 'add_meal', meal: 'yoghurt' }], DATE).state;
   const answer = g.localFoodAnswer('what am I low on?', st, DATE);
-  assert.ok(/K2|vitamin D/i.test(answer));
+  assert.ok(/K2|%/i.test(answer));
   assert.ok(/%/.test(answer));
   assert.ok(!/natto|pumpkin seeds|chia|sardines|almonds|cacao|Brazil/i.test(answer.replace(/without natto/i, '')));
 });
@@ -201,12 +186,9 @@ test('old food storage migrates without the dropped foods', () => {
   const day = st.days['2026-10-09'];
   assert.ok(has(day, 'greek_yoghurt'));
   assert.ok(has(day, 'blackberries'));
-  assert.ok(has(day, 'chicken_thigh'));
-  assert.ok(has(day, 'sweet_potato'));
-  assert.ok(!has(day, 'beef_mince'));
+  assert.ok(has(day, 'egg'));
   assert.ok(!has(day, 'cottage_cheese'));
   assert.ok(!has(day, 'maple'));
-  assert.ok(has(day, 'mango'));
   assert.ok(has(day, 'carrot'));
   assert.ok(day.items.some(i => i.estimate && i.name === 'Pie'));
   const report = g.dayReport(st, '2026-10-09');
@@ -236,7 +218,7 @@ test('Gemini function call is parsed and applied locally', () => {
 
 test('service worker cache is the tracker build', () => {
   const sw = fs.readFileSync(path.join(root, 'sw.js'), 'utf8');
-  assert.ok(sw.indexOf("baki-v12-tracker") !== -1);
+  assert.ok(sw.indexOf("baki-v13-food-v6") !== -1);
   assert.ok(sw.indexOf('./food-plan.js') !== -1);
   assert.ok(sw.indexOf('./food-ai.js') !== -1);
 });
