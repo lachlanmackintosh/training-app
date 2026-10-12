@@ -27,11 +27,11 @@ function test(name, fn) {
 
 test('v6 plan has breakfast, lunch, dinner options, snacks and supplements', () => {
   const P = g.FOOD_PLAN;
-  assert.strictEqual(P.slots.map(s => s.label).join(), 'Breakfast,Lunch,Dinner');
-  assert.strictEqual(P.slots[2].options.length, 10);
-  assert.strictEqual(P.slots[2].options.filter(o => o.tags === 'Slow cooker').length, 3);
-  assert.ok(P.slots[2].options.some(o => /Pho/.test(o.name)));
-  assert.ok(!P.slots[2].options.some(o => /lamb|mussel/i.test(o.name)));
+  assert.strictEqual(P.slots.map(s => s.label).join(), 'Wake-up / pre-training,Breakfast,Lunch,Dinner');
+  assert.strictEqual(P.slots[3].options.length, 10);
+  assert.strictEqual(P.slots[3].options.filter(o => o.tags === 'Slow cooker').length, 3);
+  assert.ok(P.slots[3].options.some(o => /Pho/.test(o.name)));
+  assert.ok(!P.slots[3].options.some(o => /lamb|mussel/i.test(o.name)));
   for (const sl of P.slots) for (const o of sl.options) {
     assert.ok(o.method && o.items.length && o.partner.length, o.id);
     for (const it of o.items.concat(o.partner)) assert.ok(P.library[it.id], it.id);
@@ -46,7 +46,7 @@ test('v6 plan has breakfast, lunch, dinner options, snacks and supplements', () 
 
 test('a full selected day hits every target except K2', () => {
   let st = { days: {} };
-  for (const meal of ['yoghurt', 'egg', 'bowl', 'snacks', 'supps']) st = g.applyFoodActions(st, [{ op: 'add_meal', meal }], DATE).state;
+  for (const meal of ['wake', 'yoghurt', 'egg', 'bowl', 'snacks', 'supps']) st = g.applyFoodActions(st, [{ op: 'add_meal', meal }], DATE).state;
   const day = st.days[DATE];
   assert.strictEqual(day.sel.yoghurt, 'b_berry');
   assert.strictEqual(day.sel.egg, 'l_egg');
@@ -91,7 +91,7 @@ test('suggestions stay inside his library and prefer the plan', () => {
     assert.ok(k2.every(s => !g.isExcludedFood(s.id, s.label)));
   const d = g.suggestionsFor('D_ug', {});
   assert.ok(d.some(s => s.id === 'uv_mushrooms'));
-  assert.ok(!d.some(s => /sardine|natto|pumpkin|chia|almond|cacao|brazil/i.test(s.id + s.label)));
+  assert.ok(!d.some(s => /sardine|natto|pumpkin|chia|almond|brazil/i.test(s.id + s.label)));
   const partial = g.applyFoodActions({}, [{ op: 'add_meal', meal: 'yoghurt' }], DATE).state;
   const report = g.dayReport(partial, DATE);
   assert.ok(report.lows.length > 0);
@@ -153,7 +153,7 @@ test('old food storage migrates without the dropped foods', () => {
   assert.ok(has(day, 'blackberries'));
   assert.ok(has(day, 'egg'));
   assert.ok(!has(day, 'cottage_cheese'));
-  assert.ok(!has(day, 'maple'));
+  assert.ok(has(day, 'dark_choc')); // legacy yoghurt tick maps to today's bowl
   assert.ok(has(day, 'carrot'));
   assert.ok(day.items.some(i => i.estimate && i.name === 'Pie'));
   const report = g.dayReport(st, '2026-10-09');
@@ -163,7 +163,7 @@ test('old food storage migrates without the dropped foods', () => {
 
 test('service worker cache is the tracker build', () => {
   const sw = fs.readFileSync(path.join(root, 'sw.js'), 'utf8');
-  assert.ok(sw.indexOf("baki-v15-slow-cooker") !== -1);
+  assert.ok(sw.indexOf("baki-v16-wakeup") !== -1);
   assert.ok(sw.indexOf('./food-plan.js') !== -1);
   assert.ok(sw.indexOf('./food-log.js') !== -1);
 });
