@@ -1,7 +1,9 @@
 /* Baki Program (Lockie Training Program) — plain JS, no build step. Data in data.js. */
 (() => {
 'use strict';
-const LS = { log: 'lockie.log.v1', draft: 'lockie.draft.v1', settings: 'lockie.settings.v1', timer: 'lockie.timer.v1', food: 'lockie.food.v2', gemini: 'lockie.gemini.key', aiChat: 'lockie.ai.chat.v1', aiSpeak: 'lockie.ai.speak.v1', aiUndo: 'lockie.ai.undo.v1' };
+const LS = { log: 'lockie.log.v1', draft: 'lockie.draft.v1', settings: 'lockie.settings.v1', timer: 'lockie.timer.v1', food: 'lockie.food.v2' };
+// Ask AI was removed (Oct 2026): clear its old keys (Gemini key, chat, undo) from the phone.
+try { ['lockie.gemini.key', 'lockie.ai.chat.v1', 'lockie.ai.speak.v1', 'lockie.ai.undo.v1'].forEach(k => localStorage.removeItem(k)); } catch (e) { /* storage blocked */ }
 const DEFAULT_SETTINGS = { start: '2026-10-05', rampEveryBlock: true, deload: false, swaps: {} };
 const $ = (s, el = document) => el.querySelector(s);
 const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -241,11 +243,10 @@ function renderHome() {
   const foodTitle = dash.hasLog ? `${comma(Math.round(dash.macros.kcal))} / ${comma(dash.targets.kcal)} kcal` : 'Nothing logged yet';
   const foodSub = dash.hasLog
     ? `${Math.round(dash.macros.p)} / ${dash.targets.protein} g protein${lowNames.length ? ' · Low: ' + lowNames.join(', ') : ' · Food targets covered'}`
-    : 'Tick a meal, or tell Ask AI what you ate.';
+    : 'Pick your meals in the Food tab.';
   view().innerHTML = `
   <div class="row between"><div><div class="muted small">${esc(fmtLong(d))}</div><h1 class="apph">${esc(APP_HEADING)}</h1></div>
     <a class="iconbtn" href="#/settings" aria-label="Settings"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"><path d="M4 8h16M4 16h16"/><circle cx="9" cy="8" r="2.25"/><circle cx="15" cy="16" r="2.25"/></svg></a></div>
-  ${askBarHtml(false)}
   <div class="card"><div class="row between wrap"><b>${esc(weekLine(bi))}</b>${phaseChip(bi)}</div>
     <div class="muted small" style="margin-top:6px">${esc(PHASES[bi.phase].short)}</div></div>
   <div class="card hero">${todayHtml}</div>
@@ -596,11 +597,6 @@ function renderHistory(m) {
 }
 
 /* ---------- food ---------- */
-function askBarHtml(slim) {
-  const hint = speechSupported() ? 'Tap to dictate, then send' : 'Tap to type, or use the mic on your keyboard';
-  const mic = '<svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path fill="currentColor" d="M12 14a3 3 0 0 0 3-3V6a3 3 0 0 0-6 0v5a3 3 0 0 0 3 3Zm-7-3a1 1 0 1 0-2 0 9 9 0 0 0 8 8.94V22h2v-2.06A9 9 0 0 0 21 11a1 1 0 1 0-2 0 7 7 0 0 1-14 0Z"/></svg>';
-  return `<button type="button" class="askbar${slim ? ' slim' : ''}" data-act="ask-open"><span class="askbar-mic" aria-hidden="true">${mic}</span><span class="askbar-copy"><b>Ask AI</b><span>${esc(hint)}</span></span></button>`;
-}
 function foodSeg(mode) {
   return `<div class="seg foodseg">
     <button type="button" class="${mode === 'meals' ? 'on' : ''}" data-act="food-view" data-v="meals">Meals</button>
@@ -643,18 +639,24 @@ function dashHtml(st) {
   const d = dayReport(st, todayStr());
   const rings = `<div class="rings">${d.macroBars.map(ringHtml).join('')}</div>`;
   const est = d.estimate ? '<div class="muted small" style="margin-top:8px">Totals include an estimate.</div>' : '';
-  const empty = d.hasLog ? '' : '<p class="muted small" style="margin:10px 0 0">Nothing selected yet. Pick your meals below, or tell Ask AI what you ate.</p>';
+  const empty = d.hasLog ? '' : '<p class="muted small" style="margin:10px 0 0">Nothing selected yet. Pick your meals below.</p>';
   return `<div class="card dash"><div class="row between"><b class="kicker">Today</b><span class="muted small">${d.nutrients.filter(n => n.pct >= 100).length} of ${d.nutrients.length} micros hit</span></div>${rings}${est}${empty}
     <details class="fold" data-keep="nuts"${d.hasLog ? ' open' : ''}><summary>Micronutrients (% of target)</summary>${nutRows(d.nutrients)}</details></div>${gapsHtml(d)}`;
 }
 function gapsHtml(d) {
   if (!d.hasLog) return '';
   const g = d.gaps || { gaps: [], ideas: [] };
-  if (!g.gaps.length) return '<div class="card gaps"><b class="kicker">Close the gaps</b><p class="muted small" style="margin:6px 0 0">Everything is at 100% or more. Nice.</p></div>';
-  const chips = g.gaps.map(x => `<span class="gapchip${x.hard ? ' hard' : ''}">${esc(x.name)} ${x.pct}%</span>`).join('');
-  const ideas = g.ideas.map(i => `<div class="irow"><div class="irow-name"><b>${esc(i.label)}</b><div class="muted small">${i.fixes ? 'Closes ' + i.fixes + ' · ' : ''}${esc(i.names.join(', '))}</div></div>${i.kind === 'option' ? `<button type="button" class="linkbtn" data-act="opt-select" data-opt="${esc(i.id)}">Add</button>` : `<button type="button" class="linkbtn" data-act="bump-add" data-bump="${esc(i.id)}">Add</button>`}</div>`).join('');
-  const note = g.gaps.some(x => x.key === 'K2_ug') ? `<div class="muted small" style="margin-top:6px">${esc(FOOD_PLAN.hardNotes.K2_ug || '')}</div>` : '';
-  return `<div class="card gaps"><b class="kicker">Close the gaps</b><div class="gapchips">${chips}</div>${ideas || '<div class="muted small">No single snack moves these much.</div>'}${note}</div>`;
+  const assumed = g.assumed ? `<div class="muted small" style="margin-top:4px">Assuming tonight's dinner: ${esc(g.assumed)}. Only what's still short after it is shown.</div>` : '';
+  const k2 = `<div class="muted small" style="margin-top:8px">${esc(FOOD_PLAN.hardNotes.K2_ug || '')}</div>`;
+  if (!g.gaps.length) return `<div class="card gaps"><b class="kicker">Close the gaps</b>${assumed}<p class="small" style="margin:6px 0 0">Everything is on track for 100%.</p>${k2}</div>`;
+  const chips = g.gaps.map(x => `<span class="gapchip">${esc(x.name)} ${x.pct}%</span>`).join('');
+  const cards = g.ideas.map(i => {
+    const what = i.closes.length ? 'Closes ' + i.closes.join(', ') : '';
+    const more = i.helps.length ? (what ? '. Also ' : '') + i.helps.join(', ') : '';
+    const enc = i.items.map(x => x.id + ':' + x.g).join(',');
+    return `<div class="sugg"><div class="sugg-t"><b>Have ${esc(i.label)}</b><div class="muted small">${esc(what + more)} · ${comma(i.kcal)} kcal</div></div><button type="button" class="btn small" data-act="sugg-add" data-items="${esc(enc)}" data-label="${esc(i.label)}">Add</button></div>`;
+  }).join('');
+  return `<div class="card gaps"><b class="kicker">Close the gaps</b>${assumed}<div class="gapchips">${chips}</div>${cards || '<div class="muted small">Nothing in the fridge closes these without overshooting.</div>'}${k2}</div>`;
 }
 function optMacroLine(o) {
   const n = optionNutrients(o);
@@ -700,7 +702,7 @@ function logCard(day) {
       <label class="gramlab"><input class="gram" type="number" inputmode="numeric" min="1" max="2500" step="1" data-grams="${esc(item.uid)}" value="${item.g}" aria-label="${esc(name)} amount"><span>${esc(u)}</span></label>
       <button type="button" class="linkbtn" data-act="log-del" data-uid="${esc(item.uid)}">Remove</button></div>`;
   }).join('');
-  return `<details class="card fold" data-keep="log"><summary>Today's log (${day.items.length} foods)</summary><div class="muted small">Selections and Ask AI entries. Edit amounts here.</div>${rows}</details>`;
+  return `<details class="card fold" data-keep="log"><summary>Today's log (${day.items.length} foods)</summary><div class="muted small">Everything selected today. Edit amounts here.</div>${rows}</details>`;
 }
 function renderMeals(st) {
   const day = normaliseFoodDay(st.days && st.days[todayStr()], st.picks);
@@ -758,7 +760,6 @@ function renderFood(arg) {
   const st = foodState();
   view().innerHTML = `<h1>Food</h1>
     <div class="muted small">Pick a breakfast, lunch and dinner. Today against your targets.</div>
-    ${mode === 'meals' ? askBarHtml(true) : ''}
     ${foodSeg(mode)}
     ${mode === 'shop' ? renderShop() : renderMeals(st)}`;
   paintMealChecks();
@@ -808,16 +809,6 @@ function renderSettings() {
     <div class="muted small" style="margin-top:8px">Now: ${esc(weekLine(bi))} · ${PHASES[bi.phase].name}</div></div>
   <div class="card">
     <label class="toggle"><span><b>Deload week</b><br><span class="muted small">Half the sets, same weights or 10% lighter. Turn off when you're back to normal.</span></span><input type="checkbox" id="set-deload" ${settings.deload ? 'checked' : ''}></label></div>
-  <div class="card"><b>Ask AI</b>
-    <div class="muted small" style="margin:4px 0 8px">Optional. Dictate or type what you ate, fix the words, then tap Send. ${geminiKey() ? 'A Gemini key is saved on this phone.' : 'No key saved yet.'}</div>
-    <input id="set-key" class="keyin" type="password" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="${geminiKey() ? 'Paste a new key to replace it' : 'Paste your Gemini API key'}">
-    <div class="grid2" style="margin-top:8px">
-      <button type="button" class="btn small" data-act="gemini-save" data-for="set-key">Save key</button>
-      <button type="button" class="btn small ghost" data-act="gemini-clear">Remove key</button>
-    </div>
-    <label class="toggle" style="margin-top:8px"><span><b>Read replies aloud</b><br><span class="muted small">Uses the phone's voice. Australian English when that voice is installed.</span></span><input type="checkbox" id="set-speak" ${speakEnabled() ? 'checked' : ''}></label>
-    <div class="muted small" style="margin-top:8px">Get a free key at <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">aistudio.google.com/apikey</a>. What you type or say about food is sent to Google. The key stays on this phone. Training logs are not sent.</div>
-  </div>
   <div class="card"><b>Backup</b><div class="grid2" style="margin-top:10px"><button class="btn ghost" data-act="export">Export JSON</button><button class="btn ghost" data-act="import">Import JSON</button></div>
     <div class="muted small" style="margin-top:8px">${log.length} sets stored on this phone. Import merges with what's here.</div></div>
   <div class="card small muted">Exercise images: <a href="https://github.com/yuhonas/free-exercise-db" target="_blank" rel="noopener">free-exercise-db</a> (public domain). Demo videos: YouTube, credited to each channel. Works offline once installed: Safari → Share → Add to Home Screen.</div>`;
@@ -852,245 +843,7 @@ function importLog() {
   inp.click();
 }
 
-/* ---------- ask AI ---------- */
-let aiChat = load(LS.aiChat, []);
-if (!Array.isArray(aiChat)) aiChat = [];
-let aiRec = null, aiRecGen = 0, aiListening = false, aiBusy = false, aiPendingListen = false, aiPrefix = '', aiQuietEnd = false, aiViewportBound = false;
-
-function speechSupported() {
-  return !!(window.SpeechRecognition || window.webkitSpeechRecognition);
-}
-function speakEnabled() { return !!load(LS.aiSpeak, false); }
-function geminiKey() {
-  const k = load(LS.gemini, '');
-  return typeof k === 'string' ? k.trim() : '';
-}
-function saveGeminiKey(raw) {
-  const key = String(raw == null ? '' : raw).trim();
-  if (key.length < 20 || key.length > 200 || /\s/.test(key)) return false;
-  save(LS.gemini, key);
-  return true;
-}
-function clearGeminiKey() { localStorage.removeItem(LS.gemini); }
-function pushAi(msg) {
-  aiChat.push(msg);
-  if (aiChat.length > 30) aiChat = aiChat.slice(-30);
-  save(LS.aiChat, aiChat);
-}
-function composeDictation(prefix, spoken) {
-  const said = String(spoken || '').replace(/\s+/g, ' ').trim();
-  if (!said) return prefix;
-  if (!prefix) return said;
-  return prefix + (/\s$/.test(prefix) ? '' : ' ') + said;
-}
-function paintMic() {
-  const b = $('#ask-mic'), live = $('#ask-live');
-  if (b) {
-    b.classList.toggle('on', aiListening);
-    b.setAttribute('aria-pressed', aiListening ? 'true' : 'false');
-    b.textContent = aiListening ? 'Stop' : (speechSupported() ? 'Speak' : 'Type');
-    b.setAttribute('aria-label', aiListening ? 'Stop dictation' : (speechSupported() ? 'Dictate' : 'Type instead'));
-  }
-  if (live) {
-    live.classList.toggle('hidden', !aiListening);
-    if (aiListening) live.textContent = 'Listening…';
-  }
-}
-function fitAskSheet() {
-  const sheet = document.querySelector('.ask-sheet');
-  const ask = $('#ask');
-  if (!sheet) return;
-  const open = ask && !ask.classList.contains('hidden');
-  if (!open || !window.visualViewport) {
-    sheet.style.height = '';
-    sheet.style.transform = '';
-    document.body.classList.remove('ask-tight');
-    return;
-  }
-  const vv = window.visualViewport;
-  const gap = Math.max(0, Math.round(window.innerHeight - (vv.offsetTop + vv.height)));
-  const h = Math.max(240, Math.min(Math.round(vv.height * 0.92), 760));
-  sheet.style.height = h + 'px';
-  sheet.style.transform = gap ? 'translateY(-' + gap + 'px)' : '';
-  document.body.classList.toggle('ask-tight', vv.height < 540);
-}
-function bindAskViewport() {
-  if (aiViewportBound || !window.visualViewport) return;
-  aiViewportBound = true;
-  visualViewport.addEventListener('resize', fitAskSheet);
-  visualViewport.addEventListener('scroll', fitAskSheet);
-}
-function renderAskLog() {
-  const log = $('#ask-log');
-  if (!log) return;
-  const undo = load(LS.aiUndo, null);
-  const summary = undo && undo.summary ? String(undo.summary) : '';
-  const lastModel = [...aiChat].reverse().find(m => m.role === 'model');
-  const summaryShown = summary && lastModel && String(lastModel.text || '').indexOf(summary) !== -1;
-  const msgs = aiChat.map(m => {
-    const text = String(m.text || '');
-    const list = Array.isArray(m.changes) ? m.changes.filter(c => text.indexOf(c) === -1) : [];
-    const changes = list.length ? `<div class="ask-changes">${list.map(esc).join('<br>')}</div>` : '';
-    const skipped = m.skipped && m.skipped.length ? `<div class="muted small">${m.skipped.map(esc).join('<br>')}</div>` : '';
-    return `<div class="ask-msg ${m.role === 'user' ? 'user' : 'model'}${m.warn ? ' warn' : ''}">${esc(text)}${changes}${skipped}</div>`;
-  }).join('');
-  const undoHtml = summary
-    ? `<div class="note">${summaryShown ? '' : esc(summary)}<button type="button" class="btn small ghost"${summaryShown ? '' : ' style="margin-top:8px"'} data-act="ask-undo">Undo</button></div>`
-    : '';
-  const hasKey = !!geminiKey();
-  const keyHtml = hasKey
-    ? `<div class="muted small">Gemini key saved on this phone. <button type="button" class="linkbtn" data-act="gemini-clear">Remove key</button></div>`
-    : `<div class="card" style="margin:0 0 10px"><b>Gemini key</b>
-        <div class="muted small" style="margin:4px 0 8px">Paste a free key to use Ask AI. It stays on this phone and is only sent to Google.</div>
-        <input id="ask-key" class="keyin" type="password" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="Paste your Gemini API key">
-        <button type="button" class="btn small" style="margin-top:8px" data-act="gemini-save" data-for="ask-key">Save key</button>
-      </div>`;
-  const empty = aiChat.length ? '' : `<div class="muted small" style="margin:8px 0">Dictate or type what you ate, then tap Send. Or ask what you are low on. Target is ${NUTRITION.protein} g protein and ${comma(NUTRITION.kcal)} kcal.</div>`;
-  log.innerHTML = `${keyHtml}
-    <label class="toggle"><span><b>Read replies aloud</b><br><span class="muted small">Short replies. Australian English when the phone has that voice.</span></span>
-      <input type="checkbox" id="ask-speak" ${speakEnabled() ? 'checked' : ''}></label>
-    ${undoHtml}${empty}${msgs}`;
-  log.scrollTop = log.scrollHeight;
-}
-function openAsk() {
-  $('#ask').classList.remove('hidden');
-  document.body.classList.add('ask-on');
-  renderAskLog();
-  paintMic();
-  bindAskViewport();
-  fitAskSheet();
-  if (!geminiKey()) {
-    aiPendingListen = speechSupported();
-    const input = $('#ask-key');
-    if (input) input.focus();
-    return;
-  }
-  if (speechSupported()) startListen();
-  else { const input = $('#ask-input'); if (input) input.focus(); }
-}
-function closeAsk() {
-  aiPendingListen = false;
-  stopListen();
-  $('#ask').classList.add('hidden');
-  document.body.classList.remove('ask-on');
-  fitAskSheet();
-  if (window.speechSynthesis) { try { speechSynthesis.cancel(); } catch (e) {} }
-}
-function askInput() { return $('#ask-input'); }
-function writeDictation(spoken) {
-  const box = askInput();
-  if (!box) return;
-  box.value = composeDictation(aiPrefix, spoken);
-  if (document.activeElement === box) {
-    const end = box.value.length;
-    try { box.setSelectionRange(end, end); } catch (e) {}
-  }
-  box.scrollTop = box.scrollHeight;
-}
-function startListen() {
-  const Ctor = window.SpeechRecognition || window.webkitSpeechRecognition;
-  if (!Ctor || aiBusy) {
-    const input = askInput();
-    if (input) input.focus();
-    if (!Ctor) {
-      pushAi({ role: 'model', text: 'This browser has no speech recognition. Type instead, or use the mic on the keyboard.', at: Date.now(), local: true, warn: true });
-      renderAskLog();
-    }
-    return;
-  }
-  if (aiListening) return;
-  if (aiRec) {
-    const old = aiRec;
-    aiRec = null;
-    aiRecGen++;
-    try { old.abort(); } catch (e) {}
-  }
-  aiQuietEnd = false;
-  const input = askInput();
-  aiPrefix = input ? input.value : '';
-  const gen = ++aiRecGen;
-  const rec = new Ctor();
-  aiRec = rec;
-  rec.lang = 'en-AU';
-  rec.interimResults = true;
-  rec.continuous = false;
-  rec.maxAlternatives = 1;
-  aiListening = true;
-  paintMic();
-  rec.onresult = ev => {
-    if (gen !== aiRecGen) return;
-    let spoken = '';
-    for (let i = 0; i < ev.results.length; i++) spoken += ev.results[i][0].transcript;
-    writeDictation(spoken);
-  };
-  rec.onerror = ev => {
-    if (gen !== aiRecGen) return;
-    const code = ev && ev.error;
-    if (!code || code === 'aborted') return;
-    if (code === 'no-speech') {
-      if (aiQuietEnd) return;
-      const box = askInput();
-      const now = box ? box.value.trim() : '';
-      if (now && now !== String(aiPrefix || '').trim()) return;
-      aiListening = false;
-      paintMic();
-      pushAi({ role: 'model', text: 'Didn\'t catch that. Tap Speak and try again.', at: Date.now(), local: true, warn: true });
-      renderAskLog();
-      return;
-    }
-    aiListening = false;
-    paintMic();
-    let msg = 'Mic didn\'t start. Type instead, or use the mic on the keyboard.';
-    if (code === 'not-allowed' || code === 'service-not-allowed') msg = 'Mic is blocked. Type instead, or allow the microphone.';
-    else if (code === 'network') msg = 'Speech needs internet. Type instead, or use the mic on the keyboard.';
-    pushAi({ role: 'model', text: msg, at: Date.now(), local: true, warn: true });
-    renderAskLog();
-  };
-  rec.onend = () => {
-    if (gen !== aiRecGen) return;
-    // iOS ends recognition by itself after a pause. Keep whatever landed in the box.
-    aiListening = false;
-    if (aiRec === rec) aiRec = null;
-    paintMic();
-  };
-  try { rec.start(); }
-  catch (e) {
-    aiListening = false;
-    if (aiRec === rec) aiRec = null;
-    paintMic();
-    pushAi({ role: 'model', text: 'Mic didn\'t start. Type instead, or use the mic on the keyboard.', at: Date.now(), local: true, warn: true });
-    renderAskLog();
-  }
-}
-function stopListen() {
-  aiQuietEnd = true;
-  aiListening = false;
-  paintMic();
-  const rec = aiRec;
-  if (!rec) return;
-  try { rec.stop(); } catch (e) {}
-}
-function endListen() {
-  aiQuietEnd = true;
-  aiListening = false;
-  aiRecGen++;
-  paintMic();
-  const rec = aiRec;
-  aiRec = null;
-  if (rec) { try { rec.abort(); } catch (e) {} }
-}
-function speakReply(text) {
-  if (!speakEnabled() || !window.speechSynthesis || !text) return;
-  try {
-    const u = new SpeechSynthesisUtterance(text);
-    u.lang = 'en-AU';
-    const voices = speechSynthesis.getVoices();
-    const au = voices.filter(v => /en-AU/i.test(v.lang))[0];
-    if (au) u.voice = au;
-    speechSynthesis.cancel();
-    speechSynthesis.speak(u);
-  } catch (e) {}
-}
+/* ---------- food refresh ---------- */
 function refreshFoodViews() {
   const open = [];
   document.querySelectorAll('details[data-keep]').forEach(d => { if (d.open) open.push(d.dataset.keep); });
@@ -1101,104 +854,6 @@ function refreshFoodViews() {
   else if (p === 'home' || p === '') renderHome();
   document.querySelectorAll('details[data-keep]').forEach(d => { if (open.indexOf(d.dataset.keep) !== -1) d.open = true; });
   scrollTo(0, y);
-}
-function undoAi() {
-  const snap = load(LS.aiUndo, null);
-  if (!snap || !snap.before) { toast('Nothing to undo'); return; }
-  const st = foodState();
-  if (snap.before.picks) st.picks = normalisePicks(snap.before.picks, snap.before.snacks);
-  if (snap.before.day) st.days[snap.date] = normaliseFoodDay(snap.before.day, st.picks, snap.before.snacks);
-  else delete st.days[snap.date];
-  saveFood(st);
-  localStorage.removeItem(LS.aiUndo);
-  toast('Undone');
-  refreshFoodViews();
-  renderAskLog();
-}
-function aiMockOn() {
-  return window.FOOD_AI_MOCK === true || /(?:\?|&)ai=mock(?:&|$)/.test(location.search);
-}
-function applyAskResult(parsed) {
-  const before = foodState();
-  const applied = applyFoodActions(before, parsed.actions, todayStr());
-  if (applied.changed) {
-    save(LS.aiUndo, {
-      date: todayStr(),
-      summary: applied.changes.join('. '),
-      before: { picks: before.picks, day: before.days[todayStr()] || blankFoodDay() }
-    });
-    saveFood(applied.state);
-    refreshFoodViews();
-  }
-  const reply = parsed.reply || (applied.changes.length ? 'Updated today\'s food.' : 'No change.');
-  pushAi({ role: 'model', text: reply, at: Date.now(), changes: applied.changes, skipped: applied.skipped });
-  renderAskLog();
-  speakReply(reply);
-}
-async function sendAsk(text) {
-  text = String(text || '').trim();
-  if (!text || aiBusy) return;
-  const local = localFoodAnswer(text, foodState(), todayStr());
-  if (local) {
-    const input = $('#ask-input');
-    if (input) input.value = '';
-    pushAi({ role: 'user', text, at: Date.now() });
-    pushAi({ role: 'model', text: local, at: Date.now(), local: true });
-    renderAskLog();
-    speakReply(local);
-    return;
-  }
-  const mock = aiMockOn();
-  if (!mock && !geminiKey()) {
-    const input = $('#ask-input');
-    if (input) input.value = text;
-    pushAi({ role: 'model', text: 'Add your free Gemini key first. It stays on this phone.', at: Date.now(), local: true, warn: true });
-    renderAskLog();
-    const k = $('#ask-key');
-    if (k) k.focus();
-    return;
-  }
-  const input = $('#ask-input');
-  if (input) input.value = '';
-  const live = $('#ask-live');
-  if (live) live.textContent = '';
-  if (!mock && typeof navigator !== 'undefined' && navigator.onLine === false) {
-    pushAi({ role: 'user', text, at: Date.now() });
-    pushAi({ role: 'model', text: 'Ask AI needs internet.', at: Date.now(), local: true, warn: true });
-    renderAskLog();
-    return;
-  }
-  aiBusy = true;
-  const sendBtn = $('#ask-send'), micBtn = $('#ask-mic');
-  if (sendBtn) sendBtn.disabled = true;
-  if (micBtn) micBtn.disabled = true;
-  pushAi({ role: 'user', text, at: Date.now() });
-  renderAskLog();
-  const prior = aiChat.slice(0, -1);
-  try {
-    if (mock) { applyAskResult(mockGeminiFood(text)); return; }
-    const body = geminiRequestBody(foodState(), todayStr(), prior, text);
-    const res = await fetch(GEMINI_URL, {
-      method: 'POST',
-      cache: 'no-store',
-      headers: { 'Content-Type': 'application/json', 'x-goog-api-key': geminiKey() },
-      body: JSON.stringify(body)
-    });
-    let data = null;
-    try { data = await res.json(); } catch (e) { data = null; }
-    if (!res.ok) throw Object.assign(new Error('api'), { code: res.status });
-    applyAskResult(parseGeminiFood(data));
-  } catch (err) {
-    const offline = navigator.onLine === false || (err && err.name === 'TypeError');
-    const msg = offline ? geminiErrorText(0, false) : geminiErrorText(Number(err && err.code) || 0, true);
-    pushAi({ role: 'model', text: msg, at: Date.now(), local: true, warn: true });
-    renderAskLog();
-  } finally {
-    aiBusy = false;
-    if (sendBtn) sendBtn.disabled = false;
-    if (micBtn) micBtn.disabled = false;
-    paintMic();
-  }
 }
 
 /* ---------- events ---------- */
@@ -1219,10 +874,6 @@ document.addEventListener('change', e => {
     if (lab) lab.classList.toggle('on', e.target.checked);
     const { total, done } = shopStats(st.checks);
     const n = $('#shop-count'); if (n) n.textContent = `${done} of ${total} ticked`;
-  }
-  if (e.target.id === 'ask-speak' || e.target.id === 'set-speak') {
-    save(LS.aiSpeak, !!e.target.checked);
-    if (!e.target.checked && window.speechSynthesis) { try { speechSynthesis.cancel(); } catch (err) {} }
   }
   if (paintingMeals) return;
   if (e.target.dataset && e.target.dataset.meal) {
@@ -1290,6 +941,12 @@ document.addEventListener('click', e => {
     if (b.dataset.close) closeSheet();
     refreshFoodViews();
   }
+  else if (act === 'sugg-add') {
+    const acts = String(b.dataset.items || '').split(',').map(x => x.split(':')).filter(x => x.length === 2).map(([id, g]) => ({ op: 'add_more', id, grams: Number(g) }));
+    const applied = applyFoodActions(foodState(), acts, todayStr());
+    if (applied.changed) { saveFood(applied.state); toast('Added ' + (b.dataset.label || '')); }
+    refreshFoodViews();
+  }
   else if (act === 'log-add') {
     const applied = applyFoodActions(foodState(), [{ op: 'add', id: b.dataset.id, meal: b.dataset.meal }], todayStr());
     if (applied.changed) saveFood(applied.state);
@@ -1303,70 +960,14 @@ document.addEventListener('click', e => {
     if (!Object.keys(st.checks).length) { toast('Nothing to clear'); return; }
     if (!confirm('Clear every tick for a new week?')) return;
     st.checks = {}; saveFood(st); renderFood('shop'); scrollTo(0, 0); toast('Shopping list cleared');
-  } else if (act === 'ask-open') {
-    if ($('#ask').classList.contains('hidden')) openAsk();
-    else if (geminiKey() && speechSupported()) startListen();
-  } else if (act === 'ask-close') closeAsk();
-  else if (act === 'ask-clear') {
-    if (!aiChat.length) { toast('Nothing to clear'); return; }
-    if (!confirm('Clear this chat? Food ticks stay.')) return;
-    aiChat = []; save(LS.aiChat, aiChat); renderAskLog();
-  } else if (act === 'ask-undo') undoAi();
-  else if (act === 'ask-mic') {
-    if (!speechSupported()) {
-      const input = $('#ask-input');
-      if (input) input.focus();
-      pushAi({ role: 'model', text: 'This browser has no speech recognition. Type instead, or use the mic on the keyboard.', at: Date.now(), local: true, warn: true });
-      renderAskLog();
-    } else if (aiListening) stopListen();
-    else startListen();
-  } else if (act === 'gemini-save') {
-    const field = document.getElementById(b.dataset.for || '');
-    if (!field || !saveGeminiKey(field.value)) { toast('Paste the full key from AI Studio'); return; }
-    field.value = '';
-    toast('Key saved on this phone');
-    if ((location.hash || '').indexOf('settings') !== -1) renderSettings();
-    if (!$('#ask').classList.contains('hidden')) {
-      renderAskLog();
-      if (aiPendingListen) { aiPendingListen = false; startListen(); }
-    }
-  } else if (act === 'gemini-clear') {
-    if (!geminiKey()) { toast('No key saved'); return; }
-    if (!confirm('Remove the Gemini key from this phone?')) return;
-    clearGeminiKey();
-    toast('Key removed');
-    if ((location.hash || '').indexOf('settings') !== -1) renderSettings();
-    if (!$('#ask').classList.contains('hidden')) renderAskLog();
   } else if (act === 'export') exportLog();
   else if (act === 'import') importLog();
   else if (act === 'finish') { const n = log.filter(x => x.d === todayStr()).length; toast(n ? `Session saved: ${n} sets. Be better, not perfect.` : 'No sets ticked today'); }
 });
-document.addEventListener('submit', e => {
-  if (e.target.id !== 'ask-form') return;
-  e.preventDefault();
-  const text = askInput() ? askInput().value : '';
-  endListen();
-  sendAsk(text);
-});
 document.addEventListener('keydown', e => {
   if (e.key === 'Escape' && sheetOpt) { closeSheet(); return; }
-  if (e.key === 'Escape' && !$('#ask').classList.contains('hidden')) { closeAsk(); return; }
-  if (e.key === 'Enter' && e.target.id === 'ask-input' && !e.shiftKey) {
-    e.preventDefault();
-    const text = e.target.value;
-    endListen();
-    sendAsk(text);
-  }
 });
-$('#ask').addEventListener('click', e => { if (e.target.id === 'ask') closeAsk(); });
 document.addEventListener('click', e => { if (e.target && e.target.id === 'sheet') closeSheet(); });
-const askBox = $('#ask-input');
-if (askBox) {
-  const editDictation = () => { if (aiListening) endListen(); fitAskSheet(); };
-  askBox.addEventListener('pointerdown', editDictation);
-  askBox.addEventListener('focus', () => { setTimeout(fitAskSheet, 50); setTimeout(fitAskSheet, 300); });
-}
-
 /* ---------- router ---------- */
 function go(h) { location.hash = h; }
 function route() {

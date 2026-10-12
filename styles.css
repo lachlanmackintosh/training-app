@@ -393,74 +393,6 @@ td.rpe{font-size:18px;font-weight:800;color:var(--accent);width:52px;white-space
 .micro-more summary{cursor:pointer;min-height:48px;display:flex;align-items:center;color:var(--accent);font-weight:700}
 .gap{color:var(--warn);font-weight:700}
 
-/* ask AI */
-.vh{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);border:0}
-.askbar{
-  display:flex;align-items:center;gap:12px;width:100%;text-align:left;
-  margin:16px 0 4px;padding:12px 14px;border-radius:22px;border:0;
-  background:var(--card);color:var(--text);min-height:72px;cursor:pointer;
-}
-.askbar-mic{
-  width:48px;height:48px;border-radius:50%;background:var(--accent);color:var(--accent-ink);
-  display:flex;align-items:center;justify-content:center;flex:none;
-}
-.askbar-mic svg{display:block}
-.askbar-copy{display:flex;flex-direction:column;gap:2px}
-.askbar-copy b{font-size:17px;letter-spacing:-.02em}
-.askbar-copy span{color:var(--muted);font-size:14px;font-weight:600}
-.askbar.slim{margin-top:14px;min-height:60px;padding:8px 12px}
-.askbar.slim .askbar-mic{width:40px;height:40px}
-.askfab{
-  position:fixed;right:16px;bottom:calc(74px + var(--safe-b));z-index:45;
-  display:flex;align-items:center;gap:8px;min-height:52px;padding:0 16px 0 14px;
-  border:0;border-radius:999px;background:var(--accent);color:var(--accent-ink);
-  font-size:15px;font-weight:800;letter-spacing:-.01em;
-  box-shadow:0 8px 24px rgba(58,212,238,.28);cursor:pointer;
-}
-.askfab svg{display:block}
-body.timer-on .askfab{bottom:calc(196px + var(--safe-b))}
-body.ask-on{overflow:hidden}
-body.ask-on .askfab{display:none}
-.ask{
-  position:fixed;inset:0;z-index:70;background:rgba(0,0,0,.55);
-  display:flex;align-items:flex-end;justify-content:center;
-}
-.ask-sheet{
-  background:var(--bg);width:min(560px,100%);
-  height:min(92vh,760px);height:min(92dvh,760px);
-  border-radius:22px 22px 0 0;display:flex;flex-direction:column;
-  border:0;padding-bottom:var(--safe-b);overflow:hidden;
-}
-.ask-head{display:flex;align-items:center;gap:8px;padding:12px 14px 10px}
-.ask-head h2{flex:1;margin:0;font-size:20px}
-.ask-head .btn{width:auto}
-.ask-log{flex:1;overflow:auto;min-height:0;padding:4px 14px 8px}
-.ask-msg{margin:8px 0;padding:12px 14px;border-radius:18px;max-width:92%;white-space:pre-wrap}
-.ask-msg.user{background:var(--accent-soft);margin-left:auto;border-radius:18px 18px 6px 18px}
-.ask-msg.model{background:var(--card);margin-right:auto;border-radius:18px 18px 18px 6px}
-.ask-msg.warn{box-shadow:inset 0 0 0 1px rgba(224,177,92,.45)}
-.ask-changes{margin-top:6px;color:var(--accent);font-size:14px;font-weight:700}
-.ask-form{padding:8px 14px 12px}
-.ask-live{display:flex;align-items:center;gap:8px;font-weight:800;color:var(--rec);min-height:22px;margin-bottom:4px}
-.ask-live::before{content:"";width:8px;height:8px;border-radius:50%;background:var(--rec);flex:none;animation:ask-rec 1.15s ease-in-out infinite}
-.ask-form textarea{
-  width:100%;min-height:8.4em;border-radius:16px;border:1px solid transparent;
-  background:var(--field);color:var(--text);
-  font:16px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
-  padding:12px;resize:none;overflow-y:auto;-webkit-overflow-scrolling:touch;color-scheme:dark;
-}
-.ask-form textarea:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
-.ask-row{display:flex;gap:8px;margin-top:8px}
-.ask-row .btn{flex:1}
-#ask-mic.on{background:var(--rec);color:#fff;animation:ask-rec 1.15s ease-in-out infinite}
-@keyframes ask-rec{0%,100%{box-shadow:0 0 0 0 rgba(255,77,94,.65)}70%{box-shadow:0 0 0 10px rgba(255,77,94,0)}}
-@media (prefers-reduced-motion:reduce){
-  #ask-mic.on,.ask-live::before{animation:none}
-  #ask-mic.on{box-shadow:0 0 0 3px rgba(255,77,94,.5)}
-}
-body.ask-tight .ask-note{display:none}
-body.ask-tight .ask-form textarea{min-height:5.6em}
-.ask-note{margin:8px 0 0;color:var(--muted);font-size:13px;line-height:1.4}
 .todaytick{display:flex;align-items:center;gap:10px;margin-top:12px;font-weight:700;min-height:48px}
 .todaytick input{width:24px;height:24px;accent-color:var(--accent)}
 .estimate{
@@ -522,3 +454,6 @@ body.ask-tight .ask-form textarea{min-height:5.6em}
 .sheet h3{margin:16px 0 4px;font-size:15px}
 .sheetbtn{width:100%;margin-top:14px}
 body.sheet-on{overflow:hidden}
+.sugg{display:flex;align-items:center;gap:10px;margin-top:10px;padding:10px 12px;border:1px solid var(--line);border-radius:14px;background:var(--card2)}
+.sugg-t{flex:1;min-width:0}
+.sugg .btn{width:auto;flex:none;padding:0 16px}
