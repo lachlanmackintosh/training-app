@@ -541,3 +541,16 @@ body.sheet-on{overflow:hidden}
 .amt{color:var(--text);font-weight:650;font-size:var(--fs-s);background:rgba(242,246,248,.05);padding:4px 10px;border-radius:999px;white-space:nowrap}
 .method{color:#c9d4da;line-height:1.55}
 @media (prefers-reduced-motion:reduce){.sheet,.sheet-wrap,.bigring .rf,.ring .rf{transition:none}}
+.rulesbtn{min-height:40px;padding:0 16px;border-radius:999px;border:0;background:var(--accent-soft);color:var(--accent);font-size:var(--fs-s);font-weight:750;cursor:pointer;letter-spacing:.01em}
+.optinfo{font-size:var(--fs-xs);color:var(--accent);margin-top:1px}
+.infobox{background:rgba(242,246,248,.04);border-radius:16px;padding:4px 14px}
+.inforow{display:grid;grid-template-columns:76px 1fr;gap:10px;padding:10px 0;border-top:1px solid var(--line);font-size:var(--fs-s);line-height:1.45}
+.inforow:first-child{border-top:0}
+.inforow span{color:var(--muted);font-weight:650;font-size:var(--fs-xs);letter-spacing:.06em;text-transform:uppercase;padding-top:2px}
+.inforow b{font-weight:600}
+.infoalt{font-size:var(--fs-s);color:var(--accent);padding:10px 0 12px;border-top:1px solid var(--line)}
+.rgroup{margin-top:6px}
+.rlist{list-style:none;margin:0;padding:0;background:rgba(242,246,248,.04);border-radius:16px}
+.rlist li{padding:11px 14px;border-top:1px solid var(--line);font-size:var(--fs-s);line-height:1.5;color:#c9d4da}
+.rlist li:first-child{border-top:0}
+.rlist li b{color:var(--text);font-weight:650}
