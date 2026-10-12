@@ -198,52 +198,6 @@ const EFFORT = [
 
 const NUTRITION = { kcal: 2750, protein: 178, carbs: 255, fat: 120 };
 
-/* Weekly shopping checklist. ids are stable for localStorage.
-   Amounts are the v4 plate x 7. Swaps replace a default; they are not extra food. */
-const SHOP = [
-  { title: 'Dairy and protein', items: [
-    ['yoghurt', 'Jalna organic full-fat Greek yoghurt — 2.1 kg'],
-    ['whey', 'Chief unflavoured whey — 280 g (40 g a day)'],
-    ['eggs', 'Pasture-raised eggs — 28'],
-    ['milk', 'Whole milk — about 1.8 L (250 mL a day). Goat milk or kefir can replace it.'],
-    ['mince', 'Grass-fed beef mince, about 5% fat — 1.61 kg raw (230 g a day). Buy less if you swap the protein.'],
-    ['cheddar', 'Raw aged cheddar or raw parmesan — 210 g']
-  ]},
-  { title: 'Produce and carbs', items: [
-    ['bread', 'Organic long-ferment sourdough — 700 g (100 g a day)'],
-    ['rice', 'White basmati — about 910 g cooked (130 g a day). Rinse it.'],
-    ['sweet', 'Organic sweet potato — carb swap, 250 g a day, not on top of the rice'],
-    ['berries', 'Organic berries — 1.4 kg (blackberries 70 g, blueberries 50 g, strawberries 40 g, raspberries 40 g)'],
-    ['avocado', 'Avocados — 14 halves (about 70 g flesh, one at lunch and one at dinner)'],
-    ['broccoli', 'Broccoli — 1.4 kg'],
-    ['rocket', 'Organic rocket — 210 g'],
-    ['onion', 'Red onion — 350 g'],
-    ['carrot', 'Carrots — 700 g'],
-    ['fruit', 'Seasonal fruit — 1.4 kg. Gold kiwi is the default, two a day.'],
-    ['juice', 'Fresh orange juice — 1.75 L (250 mL a day)'],
-    ['mushrooms', 'UV vitamin D mushrooms — optional, 100 g on the days you want them']
-  ]},
-  { title: 'Fats', items: [
-    ['butter', 'Grass-fed butter — 70 g for cooking. Ghee or tallow can replace it.'],
-    ['evoo', 'Extra virgin olive oil — 140 g, for dressing only']
-  ]},
-  { title: 'Also', items: [
-    ['broth', 'Beef bone broth — 1.75 L (250 mL a day)']
-  ]},
-  { title: 'Swaps', note: 'These replace a default. They are not extra food on top.', items: [
-    ['salmon', 'Wild salmon — protein swap, 230 g raw. No sardines.'],
-    ['chuck', 'Slow-cooked chuck — protein swap, 230 g raw'],
-    ['steak', 'Grass-fed steak — protein swap, 230 g raw'],
-    ['thigh', 'Chicken thigh — protein swap, 230 g raw'],
-    ['venison', 'Venison — protein swap, 230 g raw'],
-    ['bison', 'Bison — protein swap, 230 g raw'],
-    ['gouda', 'Aged gouda or brie — cheese swap, 30 g. A bit more K2 than cheddar.'],
-    ['ghee', 'Ghee or beef tallow — cooking-fat swap'],
-    ['kefir', 'Goat milk or kefir — milk swap'],
-    ['coconut', 'Coconut water — optional, for magnesium. Not a daily default.'],
-    ['omega', 'Omega-3 supplement — on days with no salmon']
-  ]}
-];
 
 
 const GROUP_LABEL = { explosive: 'Explosive: fast and fresh', main: 'Main lifts', muscle: 'Muscle work', finisher: 'Finisher: neck and grip' };

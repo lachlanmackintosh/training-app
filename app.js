@@ -257,8 +257,7 @@ function renderHome() {
   <div class="card foodcard"><div class="row between"><b class="kicker">Today's food</b>${dash.hasLog ? `<span class="muted small">${dash.macroBars[1].pct}% protein</span>` : ''}</div>
     <div class="cardtitle">${esc(foodTitle)}</div>
     <div class="muted small">${esc(foodSub)}</div>
-    <a class="btn ghost" style="margin-top:10px" href="#/food">Open food</a>
-    <a class="textlink" href="#/food/shop">Shopping list</a></div>
+    <a class="btn ghost" style="margin-top:10px" href="#/food">Open food</a></div>
   <div class="card"><div class="row between"><b class="kicker">Daily targets</b><span class="muted small">every day</span></div>
     <div class="grid4" style="margin-top:10px">
       <div class="stat"><b>${n.kcal}</b><span>kcal</span></div><div class="stat"><b>${n.protein}</b><span>g protein</span></div>
@@ -597,66 +596,61 @@ function renderHistory(m) {
 }
 
 /* ---------- food ---------- */
-function foodSeg(mode) {
-  return `<div class="seg foodseg">
-    <button type="button" class="${mode === 'meals' ? 'on' : ''}" data-act="food-view" data-v="meals">Meals</button>
-    <button type="button" class="${mode === 'shop' ? 'on' : ''}" data-act="food-view" data-v="shop">Shopping</button>
-  </div>`;
-}
-function shopStats(checks) {
-  let total = 0, done = 0;
-  for (const g of SHOP) for (const [id] of g.items) { total++; if (checks[id]) done++; }
-  return { total, done };
-}
-function renderShop() {
-  const st = foodState(), { total, done } = shopStats(st.checks);
-  const groups = SHOP.map(g => {
-    const items = g.items.map(([id, text]) => {
-      const on = !!st.checks[id];
-      return `<label class="check${on ? ' on' : ''}"><input type="checkbox" data-shop="${esc(id)}"${on ? ' checked' : ''}><span>${esc(text)}</span></label>`;
-    }).join('');
-    return `<div class="group-h">${esc(g.title)}</div><div class="card" style="margin-top:4px">${g.note ? `<div class="muted small">${esc(g.note)}</div>` : ''}${items}</div>`;
-  }).join('');
-  return `<div class="row between" style="margin-top:14px"><div><b id="shop-count">${done} of ${total} ticked</b>
-      <div class="muted small">The week's food. Swaps replace a default. They are not extra food.</div></div></div>
-    <button class="btn ghost" style="margin-top:10px" data-act="shop-reset">Reset for new week</button>
-    ${groups}`;
-}
 function trackBar(pct, hit) {
   const w = Math.max(0, Math.min(100, Number(pct) || 0));
   return `<div class="track${hit ? ' hit' : ''}" role="img" aria-label="${w} percent"><i style="width:${w}%"></i></div>`;
 }
-function ringHtml(b) {
-  const pct = Math.max(0, Number(b.pct) || 0), r = 26, c = 2 * Math.PI * r, off = c * (1 - Math.min(100, pct) / 100);
-  const val = b.key === 'kcal' ? comma(Math.round(b.value)) : String(Math.round(b.value));
-  return `<div class="ring${pct >= 100 ? ' hit' : ''}"><svg viewBox="0 0 64 64" aria-hidden="true"><circle cx="32" cy="32" r="${r}" class="rb"/><circle cx="32" cy="32" r="${r}" class="rf" stroke-dasharray="${c.toFixed(1)}" stroke-dashoffset="${off.toFixed(1)}"/></svg>
-    <div class="ring-in"><b>${pct}%</b></div><div class="ring-l">${esc(b.name)}</div><div class="ring-v muted">${val}${b.unit ? ' ' + esc(b.unit) : ''} / ${b.key === 'kcal' ? comma(b.target) : b.target}</div></div>`;
+function ringSvg(pct, r, sw) {
+  const c = 2 * Math.PI * r, off = c * (1 - Math.min(100, Math.max(0, pct)) / 100), box = 2 * (r + sw);
+  return `<svg viewBox="0 0 ${box} ${box}" aria-hidden="true"><circle cx="${box / 2}" cy="${box / 2}" r="${r}" class="rb" stroke-width="${sw}"/><circle cx="${box / 2}" cy="${box / 2}" r="${r}" class="rf" stroke-width="${sw}" stroke-dasharray="${c.toFixed(1)}" stroke-dashoffset="${off.toFixed(1)}"/></svg>`;
 }
-function nutRows(nuts) {
-  return nuts.map(n => `<div class="nut"><div class="row between"><span>${esc(n.name)}${n.hard ? ' <span class="muted small">known gap</span>' : ''}</span><span class="muted">${esc(formatAmount(n.value))} ${esc(n.unit)} · ${n.pct}%${n.pct >= 100 ? ' <span class="ok">✓</span>' : ''}</span></div>${trackBar(n.pct, n.pct >= 100)}</div>`).join('');
+function ringHtml(b) {
+  const pct = Math.max(0, Number(b.pct) || 0);
+  const val = b.key === 'kcal' ? comma(Math.round(b.value)) : String(Math.round(b.value));
+  return `<div class="ring${pct >= 100 ? ' hit' : ''}">${ringSvg(pct, 26, 5)}
+    <div class="ring-in"><b>${pct}<small>%</small></b></div><div class="ring-l">${esc(b.name)}</div><div class="ring-v">${val}${b.unit ? ' ' + esc(b.unit) : ''} / ${b.key === 'kcal' ? comma(b.target) : b.target}</div></div>`;
+}
+function microGrid(nuts, short) {
+  const list = nuts.slice().sort((a, b) => a.pct - b.pct || a.name.localeCompare(b.name));
+  return `<div class="mgrid">${list.map(n => {
+    const cls = n.pct >= 100 ? 'hit' : n.hard ? 'hard' : (!short || short[n.key]) ? 'low' : 'plan';
+    return `<div class="mt ${cls}"><div class="mt-h"><span class="mt-n">${esc(n.name)}</span><b>${n.pct}%</b></div>${trackBar(n.pct, n.pct >= 100)}<div class="mt-v">${esc(formatAmount(n.value))} / ${esc(formatAmount(n.target))} ${esc(n.unit)}${n.hard ? ' · known gap' : ''}</div></div>`;
+  }).join('')}</div>`;
 }
 function dashHtml(st) {
   const d = dayReport(st, todayStr());
-  const rings = `<div class="rings">${d.macroBars.map(ringHtml).join('')}</div>`;
-  const est = d.estimate ? '<div class="muted small" style="margin-top:8px">Totals include an estimate.</div>' : '';
-  const empty = d.hasLog ? '' : '<p class="muted small" style="margin:10px 0 0">Nothing selected yet. Pick your meals below.</p>';
-  return `<div class="card dash"><div class="row between"><b class="kicker">Today</b><span class="muted small">${d.nutrients.filter(n => n.pct >= 100).length} of ${d.nutrients.length} micros hit</span></div>${rings}${est}${empty}
-    <details class="fold" data-keep="nuts"${d.hasLog ? ' open' : ''}><summary>Micronutrients (% of target)</summary>${nutRows(d.nutrients)}</details></div>${gapsHtml(d)}`;
+  const kc = d.macroBars[0];
+  const left = Math.round(kc.target - kc.value);
+  const kcLine = !d.hasLog ? 'Pick your meals below' : left >= 0 ? `${comma(left)} kcal to go` : `${comma(-left)} kcal over`;
+  const hit = d.nutrients.filter(n => n.pct >= 100).length;
+  const short = {};
+  for (const x of (d.gaps && d.gaps.gaps) || []) short[x.key] = 1;
+  const lows = d.nutrients.filter(n => short[n.key]).length;
+  const coming = d.nutrients.filter(n => n.pct < 100 && !n.hard && !short[n.key]).length;
+  const est = d.estimate ? '<div class="muted small" style="margin-top:10px">Totals include an estimate.</div>' : '';
+  const hero = `<section class="card hero fhero">
+    <div class="fh-top"><div class="bigring${kc.pct >= 100 ? ' hit' : ''}">${ringSvg(kc.pct, 56, 9)}<div class="bigring-in"><b>${comma(Math.round(kc.value))}</b><span>of ${comma(kc.target)} kcal</span></div></div>
+      <div class="fh-side"><span class="kicker">Today</span><div class="fh-big">${esc(kcLine)}</div>
+        <div class="fh-stat"><b>${hit}</b><span>/ ${d.nutrients.length} micros hit</span></div>
+        <div class="fh-stat"><b>${Math.round(d.macros.p)}</b><span>/ ${d.targets.protein} g protein</span></div></div></div>
+    <div class="rings">${d.macroBars.slice(1).map(ringHtml).join('')}</div>${est}</section>`;
+  const micro = d.hasLog ? `<section class="card mcard"><div class="row between"><b class="kicker">Micronutrients</b><span class="pill${lows ? ' warn' : ' good'}">${lows ? lows + ' short' : coming ? 'On track' : 'All hit'}</span></div>${coming ? `<div class="muted tiny" style="margin-top:6px">Amber = still short after today's plan. The rest are covered by meals still to come.</div>` : ''}${microGrid(d.nutrients, short)}</section>` : '';
+  return hero + gapsHtml(d) + micro;
 }
 function gapsHtml(d) {
   if (!d.hasLog) return '';
   const g = d.gaps || { gaps: [], ideas: [] };
-  const assumed = g.assumed ? `<div class="muted small" style="margin-top:4px">Assuming tonight's dinner: ${esc(g.assumed)}. Only what's still short after it is shown.</div>` : '';
-  const k2 = `<div class="muted small" style="margin-top:8px">${esc(FOOD_PLAN.hardNotes.K2_ug || '')}</div>`;
-  if (!g.gaps.length) return `<div class="card gaps"><b class="kicker">Close the gaps</b>${assumed}<p class="small" style="margin:6px 0 0">Everything is on track for 100%.</p>${k2}</div>`;
-  const chips = g.gaps.map(x => `<span class="gapchip">${esc(x.name)} ${x.pct}%</span>`).join('');
-  const cards = g.ideas.map(i => {
-    const what = i.closes.length ? 'Closes ' + i.closes.join(', ') : '';
-    const more = i.helps.length ? (what ? '. Also ' : '') + i.helps.join(', ') : '';
-    const enc = i.items.map(x => x.id + ':' + x.g).join(',');
-    return `<div class="sugg"><div class="sugg-t"><b>Have ${esc(i.label)}</b><div class="muted small">${esc(what + more)} · ${comma(i.kcal)} kcal</div></div><button type="button" class="btn small" data-act="sugg-add" data-items="${esc(enc)}" data-label="${esc(i.label)}">Add</button></div>`;
+  const ctx = [g.evening ? 'After Meal 3: small snacks and drinks only.' : (g.assumed ? `Counting the plan for meals still to come (${g.assumed}).` : ''), g.assumedSupps ? 'Daily supplements counted.' : ''].filter(Boolean).join(' ');
+  const k2 = `<div class="gfoot">${esc(FOOD_PLAN.hardNotes.K2_ug || '')}</div>`;
+  if (!g.gaps.length) return `<section class="card gaps done"><div class="row between"><b class="kicker">Close the gaps</b><span class="pill good">Nothing needed</span></div>
+    <div class="gdone"><span class="gcheck">✓</span><div><b>You're covered today.</b><div class="muted small">Every target is on track for 100%.${ctx ? ' ' + esc(ctx) : ''}</div></div></div>${k2}</section>`;
+  const chips = g.gaps.slice().sort((a, b) => a.pct - b.pct).map(x => `<span class="gapchip">${esc(x.name)} ${x.pct}%</span>`).join('');
+  const cards = g.ideas.map((i, n) => {
+    const enc = i.items.map(x => x.id + ':' + x.g + ':' + (x.meal || 'snacks')).join(',');
+    return `<div class="sugg"><span class="sugg-n">${n + 1}</span><div class="sugg-t"><b>${esc(i.label)}</b><div class="sugg-why">${esc(i.why || '')}</div><div class="muted tiny">${comma(i.kcal)} kcal${i.closes.length ? ' · closes ' + esc(i.closes.join(', ')) : ''}</div></div><button type="button" class="addbtn" data-act="sugg-add" data-items="${esc(enc)}" data-label="${esc(i.label)}" aria-label="Add ${esc(i.label)}">Add</button></div>`;
   }).join('');
-  return `<div class="card gaps"><b class="kicker">Close the gaps</b>${assumed}<div class="gapchips">${chips}</div>${cards || '<div class="muted small">Nothing in the fridge closes these without overshooting.</div>'}${k2}</div>`;
+  return `<section class="card gaps"><div class="row between"><b class="kicker">Close the gaps</b><span class="muted tiny">${g.gaps.length} short</span></div>${ctx ? `<div class="muted small" style="margin-top:4px">${esc(ctx)}</div>` : ''}
+    <div class="gapchips">${chips}</div>${cards || '<div class="muted small">Nothing on the plan closes these without going over a limit. Fine to leave for today.</div>'}${k2}</section>`;
 }
 function optMacroLine(o) {
   const n = optionNutrients(o);
@@ -664,22 +658,19 @@ function optMacroLine(o) {
 }
 function optRow(o, on, multi) {
   return `<div class="optrow${on ? ' on' : ''}"><button type="button" class="optmain" data-act="opt-open" data-opt="${esc(o.id)}"><b>${esc(o.name)}</b><span class="muted small">${esc(optMacroLine(o))}${o.tags && (o.tags.indexOf('night') === 0 || o.tags === 'Slow cooker') ? ' · ' + esc(o.tags) : ''}</span></button>
-    <button type="button" class="optpick${on ? ' on' : ''}" data-act="${on ? 'opt-remove' : 'opt-select'}" data-opt="${esc(o.id)}" aria-label="${on ? 'Remove' : 'Select'} ${esc(o.name)}">${on ? '✓' : (multi ? '+' : '○')}</button></div>`;
+    <button type="button" class="optpick${on ? ' on' : ''}" data-act="${on ? 'opt-remove' : 'opt-select'}" data-opt="${esc(o.id)}" aria-label="${on ? 'Remove' : 'Select'} ${esc(o.name)}">${on ? '✓' : (multi ? '+' : '')}</button></div>`;
 }
 function slotCard(day, sl) {
   const sel = day.sel && day.sel[sl.id];
   const tonight = sl.id === 'bowl' ? defaultOption('bowl', todayStr()) : '';
   const opts = sl.options.map(o => optRow(o, o.id === sel, false)).join('');
-  const sub = sel ? 'Selected: ' + optionById(sel).name : (tonight ? 'Tonight on the rotation: ' + optionById(tonight).name : 'Pick one');
-  return `<div class="card"><div class="row between"><h3 style="margin:0">${esc(sl.label)}</h3><span class="muted small">${esc(sl.short)}</span></div><div class="muted small">${esc(sub)}</div>${opts}</div>`;
+  const sub = sel ? optionById(sel).name : (tonight ? 'Tonight: ' + optionById(tonight).name : 'Pick one');
+  const extras = day.items.filter(i => i.meal === sl.id && i.extra).map(i => friendlyAmount(i.id, i.g) + ' ' + foodName(i.id).toLowerCase());
+  return `<section class="card slot${sel ? ' picked' : ''}"><div class="slot-h"><div><h3>${esc(sl.label)}</h3><div class="muted tiny">${esc(sl.short)}</div></div><span class="slot-s${sel ? ' on' : ''}">${sel ? '✓ ' : ''}${esc(sub)}</span></div>${extras.length ? `<div class="muted tiny" style="margin-top:6px">Added: ${esc(extras.join(', '))}</div>` : ''}${opts}</section>`;
 }
 function multiCard(day, title, list, sub) {
   const rows = list.map(o => optRow(o, day.items.some(i => i.opt === o.id), true)).join('');
-  return `<div class="card"><h3 style="margin:0">${esc(title)}</h3><div class="muted small">${esc(sub)}</div>${rows}</div>`;
-}
-function foodNote(id) {
-  const food = FOOD_PLAN.library[id];
-  return food && food.note ? food.note : '';
+  return `<section class="card slot"><div class="slot-h"><div><h3>${esc(title)}</h3><div class="muted tiny">${esc(sub)}</div></div></div>${rows}</section>`;
 }
 function unitOf(id) { return (FOOD_PLAN.library[id] && FOOD_PLAN.library[id].unit) || 'g'; }
 function logCard(day) {
@@ -687,31 +678,33 @@ function logCard(day) {
   const label = it => {
     if (it.opt && optionById(it.opt)) return optionById(it.opt).name;
     const sl = (FOOD_PLAN.slots || []).find(s => s.id === it.meal);
-    return sl ? sl.label : (it.meal === 'snacks' ? 'Snacks' : it.meal === 'supps' ? 'Supplements' : 'Added');
+    return sl ? sl.label + (it.extra ? ' · added' : '') : (it.meal === 'snacks' ? 'Snacks' : it.meal === 'supps' ? 'Supplements' : 'Added');
   };
   const rows = day.items.map(item => {
     const name = item.estimate ? item.name : foodName(item.id);
     const badge = item.estimate ? '<span class="estimate">Estimate</span>' : '';
-    const sub = `<div class="muted small">${esc(label(item))}</div>`;
+    const casual = !item.estimate && CASUAL[item.id] ? ' · ' + friendlyAmount(item.id, item.g) : '';
+    const sub = `<div class="muted small">${esc(label(item) + casual)}</div>`;
     if (item.flat) {
       const kcal = item.tot && item.tot.kcal ? Math.round(item.tot.kcal) : 0;
       return `<div class="irow"><div class="irow-name"><b>${esc(name)}${badge}</b><div class="muted small">About ${comma(kcal)} kcal</div></div><button type="button" class="linkbtn" data-act="log-del" data-uid="${esc(item.uid)}">Remove</button></div>`;
     }
     const u = item.estimate ? 'g' : unitOf(item.id);
     return `<div class="irow"><div class="irow-name"><b>${esc(name)}${badge}</b>${sub}</div>
-      <label class="gramlab"><input class="gram" type="number" inputmode="numeric" min="1" max="2500" step="1" data-grams="${esc(item.uid)}" value="${item.g}" aria-label="${esc(name)} amount"><span>${esc(u)}</span></label>
+      <label class="gramlab"><input class="gram" type="number" inputmode="decimal" min="0.1" max="2500" step="any" data-grams="${esc(item.uid)}" value="${item.g}" aria-label="${esc(name)} amount"><span>${esc(u)}</span></label>
       <button type="button" class="linkbtn" data-act="log-del" data-uid="${esc(item.uid)}">Remove</button></div>`;
   }).join('');
-  return `<details class="card fold" data-keep="log"><summary>Today's log (${day.items.length} foods)</summary><div class="muted small">Everything selected today. Edit amounts here.</div>${rows}</details>`;
+  return `<details class="card fold" data-keep="log"><summary>Today's log (${day.items.length} foods)</summary><div class="muted small">Everything selected today. Edit amounts in grams here.</div>${rows}</details>`;
 }
 function renderMeals(st) {
   const day = normaliseFoodDay(st.days && st.days[todayStr()], st.picks);
-  return dashHtml(st) + (FOOD_PLAN.slots || []).map(sl => slotCard(day, sl)).join('') +
-    multiCard(day, 'Snacks & drinks', FOOD_PLAN.snacks || [], 'Add as many as you have. The first four are the daily drinks.') +
+  return dashHtml(st) + `<div class="sect">Meals</div>` + (FOOD_PLAN.slots || []).map(sl => slotCard(day, sl)).join('') +
+    multiCard(day, 'Snacks & drinks', FOOD_PLAN.snacks || [], 'Add as many as you have. The first three are the daily drinks.') +
     multiCard(day, 'Supplements', FOOD_PLAN.supplements || [], 'Daily.') + logCard(day) +
     `<details class="card fold" data-keep="rules"><summary>How to eat this</summary><ul class="bul small">${FOOD_PLAN.rules.map(r => `<li>${esc(r)}</li>`).join('')}</ul></details>`;
 }
 let sheetOpt = '';
+let sheetTimer = 0;
 function openSheet(optId) {
   const o = optionById(optId);
   if (!o) return;
@@ -724,26 +717,34 @@ function openSheet(optId) {
   const T = FOOD_PLAN.targets;
   const macros = [['kcal', 'Calories', n.kcal, T.kcal, ''], ['p', 'Protein', n.protein_g, T.protein, 'g'], ['c', 'Carbs', n.carbs_g, T.carbs, 'g'], ['f', 'Fat', n.fat_g, T.fat, 'g'], ['fib', 'Fibre', n.fibre_g, T.fibre, 'g']]
     .map(([key, name, value, target, unit]) => ringHtml({ key, name, value, target, unit, pct: nutrientPct(value, target) })).join('');
-  const nuts = FOOD_PLAN.nutrients.map(x => ({ key: x.key, name: x.name, unit: x.unit, hard: x.hard, value: n[x.key] || 0, pct: nutrientPct(n[x.key] || 0, FOOD_PLAN.sillz[x.key]) }));
-  const ings = o.items.map(it => `<div class="irow"><div class="irow-name"><b>${esc(foodName(it.id))}</b></div><span class="muted">${it.g} ${esc(unitOf(it.id))}</span></div>`).join('');
+  const nuts = FOOD_PLAN.nutrients.map(x => ({ key: x.key, name: x.name, unit: x.unit, hard: x.hard, value: n[x.key] || 0, target: FOOD_PLAN.sillz[x.key], pct: nutrientPct(n[x.key] || 0, FOOD_PLAN.sillz[x.key]) }));
+  const ings = o.items.map(it => `<div class="irow"><div class="irow-name">${esc(foodName(it.id))}</div><span class="amt">${esc(friendlyAmount(it.id, it.g))}</span></div>`).join('');
   const slotLabel = hit.meal === 'snacks' ? 'Snacks & drinks' : hit.meal === 'supps' ? 'Supplements' : slotById(hit.meal).label;
   let el = document.getElementById('sheet');
-  if (!el) { el = document.createElement('div'); el.id = 'sheet'; el.className = 'sheet-wrap'; document.body.appendChild(el); }
-  el.innerHTML = `<div class="sheet" role="dialog" aria-modal="true" aria-label="${esc(o.name)}">
+  if (!el) { el = document.createElement('div'); el.id = 'sheet'; el.className = 'sheet-wrap hidden'; document.body.appendChild(el); }
+  el.innerHTML = `<div class="sheet" role="dialog" aria-modal="true" aria-label="${esc(o.name)}"><div class="grab"></div>
     <div class="row between"><span class="kicker">${esc(slotLabel)}</span><button type="button" class="linkbtn" data-act="sheet-close">Close</button></div>
-    <h2 style="margin:4px 0 10px">${esc(o.name)}</h2>
-    <div class="rings">${macros}</div>
+    <h2 class="sheet-t">${esc(o.name)}</h2>
+    <div class="muted small">${comma(Math.round(n.kcal))} kcal · P ${Math.round(n.protein_g)} g · C ${Math.round(n.carbs_g)} g · F ${Math.round(n.fat_g)} g</div>
+    <div class="rings five">${macros}</div>
     <h3>Ingredients</h3>${ings}
-    <h3>How to prepare</h3><p class="small">${esc(o.method || '')}</p>
-    <details class="fold" open><summary>Micronutrients (% of daily target)</summary>${nutRows(nuts)}</details>
+    <h3>How to prepare</h3><p class="small method">${esc(o.method || '')}</p>
+    <h3>Micronutrients <span class="muted tiny">% of daily target</span></h3>${microGrid(nuts)}
     <button type="button" class="btn sheetbtn" data-act="${on ? 'opt-remove' : 'opt-select'}" data-opt="${esc(optId)}" data-close="1">${on ? 'Remove from today' : 'Select'}</button></div>`;
+  clearTimeout(sheetTimer);
   el.classList.remove('hidden');
+  el.querySelector('.sheet').scrollTop = 0;
+  requestAnimationFrame(() => requestAnimationFrame(() => el.classList.add('open')));
   document.body.classList.add('sheet-on');
 }
 function closeSheet() {
   sheetOpt = '';
   const el = document.getElementById('sheet');
-  if (el) el.classList.add('hidden');
+  if (el) {
+    el.classList.remove('open');
+    clearTimeout(sheetTimer);
+    sheetTimer = setTimeout(() => el.classList.add('hidden'), 260);
+  }
   document.body.classList.remove('sheet-on');
 }
 let paintingMeals = false;
@@ -755,13 +756,11 @@ function paintMealChecks() {
   });
   paintingMeals = false;
 }
-function renderFood(arg) {
-  const mode = arg === 'shop' ? 'shop' : 'meals';
+function renderFood() {
   const st = foodState();
   view().innerHTML = `<h1>Food</h1>
-    <div class="muted small">Pick a breakfast, lunch and dinner. Today against your targets.</div>
-    ${foodSeg(mode)}
-    ${mode === 'shop' ? renderShop() : renderMeals(st)}`;
+    <div class="muted small">Morning snack, then Meals 1, 2 and 3. Today against your targets.</div>
+    ${renderMeals(st)}`;
   paintMealChecks();
 }
 
@@ -866,15 +865,6 @@ document.addEventListener('input', e => {
 });
 document.addEventListener('change', e => {
   if (e.target.dataset && e.target.dataset.act === 'short') { ui.short = e.target.checked; renderWorkout(view().dataset.day); }
-  if (e.target.dataset && e.target.dataset.shop) {
-    const st = foodState(), id = e.target.dataset.shop;
-    if (e.target.checked) st.checks[id] = true; else delete st.checks[id];
-    saveFood(st);
-    const lab = e.target.closest('.check');
-    if (lab) lab.classList.toggle('on', e.target.checked);
-    const { total, done } = shopStats(st.checks);
-    const n = $('#shop-count'); if (n) n.textContent = `${done} of ${total} ticked`;
-  }
   if (paintingMeals) return;
   if (e.target.dataset && e.target.dataset.meal) {
     const op = e.target.dataset.state === 'on' ? 'clear_meal' : 'add_meal';
@@ -893,8 +883,8 @@ document.addEventListener('change', e => {
     refreshFoodViews();
   }
   if (e.target.dataset && e.target.dataset.grams) {
-    const g = Math.round(Number(e.target.value));
-    if (!g || g < 1 || g > 2500) { refreshFoodViews(); return; }
+    const g = Math.round(Number(e.target.value) * 10) / 10;
+    if (!g || g <= 0 || g > 2500) { refreshFoodViews(); return; }
     const res = setItemGrams(foodState(), todayStr(), e.target.dataset.grams, g);
     if (res.changed) { saveFood(res.state); refreshFoodViews(); }
   }
@@ -931,7 +921,6 @@ document.addEventListener('click', e => {
   else if (act === 'hiit-reset') pReset();
   else if (act === 'hiit-skip') { unlockAudio(); pNext(false); }
   else if (act === 'mob-prev') { unlockAudio(); pPrev(); }
-  else if (act === 'food-view') go(b.dataset.v === 'shop' ? '#/food/shop' : '#/food');
   else if (act === 'opt-open') openSheet(b.dataset.opt);
   else if (act === 'sheet-close') closeSheet();
   else if (act === 'opt-select' || act === 'opt-remove') {
@@ -942,7 +931,7 @@ document.addEventListener('click', e => {
     refreshFoodViews();
   }
   else if (act === 'sugg-add') {
-    const acts = String(b.dataset.items || '').split(',').map(x => x.split(':')).filter(x => x.length === 2).map(([id, g]) => ({ op: 'add_more', id, grams: Number(g) }));
+    const acts = String(b.dataset.items || '').split(',').map(x => x.split(':')).filter(x => x.length >= 2).map(([id, g, meal]) => ({ op: 'add_more', id, grams: Number(g), meal: meal || 'snacks' }));
     const applied = applyFoodActions(foodState(), acts, todayStr());
     if (applied.changed) { saveFood(applied.state); toast('Added ' + (b.dataset.label || '')); }
     refreshFoodViews();
@@ -955,11 +944,6 @@ document.addEventListener('click', e => {
     const applied = applyFoodActions(foodState(), [{ op: 'remove', uid: b.dataset.uid }], todayStr());
     if (applied.changed) { saveFood(applied.state); toast('Removed'); }
     refreshFoodViews();
-  } else if (act === 'shop-reset') {
-    const st = foodState();
-    if (!Object.keys(st.checks).length) { toast('Nothing to clear'); return; }
-    if (!confirm('Clear every tick for a new week?')) return;
-    st.checks = {}; saveFood(st); renderFood('shop'); scrollTo(0, 0); toast('Shopping list cleared');
   } else if (act === 'export') exportLog();
   else if (act === 'import') importLog();
   else if (act === 'finish') { const n = log.filter(x => x.d === todayStr()).length; toast(n ? `Session saved: ${n} sets. Be better, not perfect.` : 'No sets ticked today'); }

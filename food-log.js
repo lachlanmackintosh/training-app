@@ -38,7 +38,7 @@ function newUid() {
   return ('f' + _uidn.toString(36) + r).slice(0, 24);
 }
 function clampG(v) {
-  const n = Math.round(Number(v));
+  const n = Math.round(Number(v) * 10) / 10;
   if (!isFinite(n) || n <= 0 || n > 2500) return 0;
   return n;
 }
@@ -188,6 +188,7 @@ function sanitiseItem(raw, seen) {
   const slot = slotIdOf(raw.slot);
   const out = { uid, id, g, meal, slot, edited: !!raw.edited };
   if (typeof raw.opt === 'string' && OPTS[raw.opt]) out.opt = raw.opt;
+  if (raw.extra === true) out.extra = true;
   return out;
 }
 function legacyCustom(c) {
@@ -359,6 +360,45 @@ function formatAmount(n) {
   const r = Math.abs(n) >= 20 ? Math.round(n) : Math.round(n * 10) / 10;
   return String(r);
 }
+/* Friendly measures for foods where precision doesn't matter. Nutrition always uses the grams underneath. */
+const FRACS = [[0.125, '⅛'], [0.25, '¼'], [1 / 3, '⅓'], [0.5, '½'], [2 / 3, '⅔'], [0.75, '¾'], [1, '1'], [1.5, '1½'], [2, '2'], [2.5, '2½'], [3, '3'], [4, '4']];
+function nearFrac(x) {
+  let best = FRACS[0];
+  for (const f of FRACS) if (Math.abs(f[0] - x) < Math.abs(best[0] - x)) best = f;
+  return best;
+}
+function countOf(g, per, one, many) {
+  const f = nearFrac(g / per);
+  return f[1] + ' ' + (f[0] > 1 ? many : one);
+}
+const CASUAL = {
+  cinnamon: g => countOf(g, 2.6, 'tsp', 'tsp'),
+  garlic: g => { const n = Math.max(1, Math.round(g / 4)); return n + (n > 1 ? ' cloves' : ' clove'); },
+  lemon: g => countOf(g, 10, 'wedge', 'wedges'),
+  lime: g => countOf(g, 10, 'wedge', 'wedges'),
+  dill: g => g <= 6 ? 'small handful' : 'handful',
+  coriander: g => g <= 6 ? 'small handful' : g <= 15 ? 'handful' : 'big handful',
+  spring_onion: g => countOf(g, 15, 'spring onion', 'spring onions'),
+  cos: g => g <= 35 ? 'handful' : g <= 70 ? '2 handfuls' : '3 handfuls',
+  rocket: g => g <= 25 ? 'handful' : '2 handfuls',
+  red_onion: g => g <= 20 ? '2 tbsp diced' : countOf(g, 150, 'onion', 'onions'),
+  cucumber: g => countOf(g, 130, 'cucumber', 'cucumbers'),
+  tomato: g => countOf(g, 120, 'tomato', 'tomatoes'),
+  capsicum: g => countOf(g, 160, 'capsicum', 'capsicums'),
+  evoo: g => g >= 15 ? countOf(g, 18, 'tbsp', 'tbsp') : countOf(g, 5, 'tsp', 'tsp'),
+  butter: g => g >= 15 ? countOf(g, 18, 'tbsp', 'tbsp') : countOf(g, 5, 'tsp', 'tsp'),
+  ghee: g => g >= 15 ? countOf(g, 18, 'tbsp', 'tbsp') : countOf(g, 5, 'tsp', 'tsp'),
+  tallow: g => g >= 15 ? countOf(g, 18, 'tbsp', 'tbsp') : countOf(g, 5, 'tsp', 'tsp'),
+  honey: g => (g >= 18 ? countOf(g, 21, 'tbsp', 'tbsp') : countOf(g, 7, 'tsp', 'tsp')) + ' · ' + formatAmount(g) + ' g',
+  maple: g => countOf(g, 6.5, 'tsp', 'tsp') + ' · ' + formatAmount(g) + ' g',
+  dark_choc: g => countOf(g, 7.5, 'square', 'squares') + ' · ' + formatAmount(g) + ' g'
+};
+function friendlyAmount(id, g) {
+  const fn = CASUAL[id];
+  if (fn && g > 0) return fn(Number(g));
+  const unit = (LIB[id] && LIB[id].unit) || 'g';
+  return formatAmount(Number(g)) + ' ' + unit;
+}
 function nutrientPct(value, target) {
   if (!target) return 0;
   return Math.max(0, Math.round(value / target * 100));
@@ -400,7 +440,7 @@ function mealTickState(day, meal, picks) {
   if (need.length && have >= need.length) return 'on';
   return 'part';
 }
-function dayReport(st, date) {
+function dayReport(st, date, hour) {
   const state = loadFoodState(st && st.days ? { picks: st.picks, snacks: st.snacks, checks: st.checks, days: st.days, v: st.v } : (st || {}));
   const day = state.days[date] || blankFoodDay();
   const sum = sumNutrients(day.items.map(itemNutrients));
@@ -434,46 +474,107 @@ function dayReport(st, date) {
     hasLog: day.items.length > 0, estimate, macros, targets: TARGETS, macroBars,
     nutrients, lows, hard: nutrients.filter(n => n.hard), day, picks: state.picks, sum
   };
-  out.gaps = closeGaps(out, date);
+  out.gaps = closeGaps(out, date, hour);
   return out;
 }
-/* Built-in gap suggester (no AI). Pool = foods already on the plan / shopping list, in sensible steps (FOOD_PLAN.pantry).
-   Searches 1-3 item combos that close the most % gap: micros under 100% (K2 ignored), protein if short, fibre.
-   Penalises going over upper limits and big calorie overshoot. Before dinner is picked, tonight's rotation dinner is assumed. */
-const UPPER = { A_ug: 3000, selenium_ug: 400, zinc_mg: 40, iron_mg: 45, D_ug: 100 };
-function comboLabel(units) {
-  return units.map(u => u.label).join(' + ');
+/* Built-in gap suggester (no AI), time-of-day aware.
+   Pool = foods on the plan / shopping list in sensible steps (FOOD_PLAN.pantry). Each food knows which meals it fits.
+   Before Meal 3 is picked, today's rotation dinner is assumed. Ideas go into the next meal that is still to come
+   (e.g. +1 egg at Meal 2, broccoli at Meal 3); after Meal 3 only small snacks and drinks. K2 is ignored.
+   Hard limits: daily upper limits (incl. manganese) and a normal daily amount per food. Top 3 never share a food. */
+const UPPER = { A_ug: 3000, D_ug: 80, E_mg: 300, B6_mg: 50, selenium_ug: 400, zinc_mg: 40, iron_mg: 45, copper_mg: 10, manganese_mg: 11, calcium_mg: 2500, iodine_ug: 1100, phosphorus_mg: 4000 };
+const SLOT_END = { wake: 7, yoghurt: 10, egg: 14, bowl: 20 }; // a meal is still "to come" before this hour
+const PANTRY_META = {
+  clo: { kind: 'supp', group: 'supp' }, d3k2_2drops: { kind: 'supp', group: 'supp' },
+  milk_cow: { kind: 'snack', group: 'dairy', max: 650 }, orange_juice: { kind: 'snack', group: 'juice', max: 260 },
+  coconut_water: { kind: 'snack', group: 'drink', max: 500 }, bone_broth: { kind: 'snack', group: 'broth', fits: ['wake'], max: 250 },
+  kiwi_gold: { kind: 'snack', group: 'fruit', fits: ['yoghurt'], max: 300 }, mango: { kind: 'snack', group: 'fruit', fits: ['yoghurt'], max: 250 },
+  greek_yoghurt: { kind: 'snack', group: 'dairy', fits: ['yoghurt'], max: 500 }, whey: { kind: 'snack', group: 'whey', fits: ['yoghurt'], max: 90 },
+  blueberries: { kind: 'snack', group: 'berries', fits: ['yoghurt'], max: 200 }, raspberries: { kind: 'snack', group: 'berries', fits: ['yoghurt'], max: 200 },
+  blackberries: { kind: 'snack', group: 'berries', fits: ['yoghurt'], max: 200 }, strawberries: { kind: 'snack', group: 'berries', fits: ['yoghurt'], max: 200 },
+  raw_cheddar: { kind: 'snack', group: 'cheese', fits: ['egg'], max: 60 }, carrot: { kind: 'snack', group: 'veg', max: 200 },
+  egg: { kind: 'meal', group: 'egg', fits: ['egg'], max: 400 }, avocado: { kind: 'meal', group: 'avocado', fits: ['egg', 'bowl'], max: 140 },
+  broccoli: { kind: 'meal', group: 'greens', fits: ['bowl', 'egg'], max: 300 }, sourdough: { kind: 'meal', group: 'starch', fits: ['egg'], max: 100 },
+  cucumber: { kind: 'meal', group: 'salad', fits: ['bowl', 'egg'], max: 200 }, tomato: { kind: 'meal', group: 'salad', fits: ['bowl', 'egg'], max: 240 },
+  capsicum: { kind: 'meal', group: 'salad', fits: ['bowl', 'egg'], max: 240 }, potato: { kind: 'meal', group: 'starch', fits: ['bowl', 'egg'], max: 400 },
+  rice: { kind: 'meal', group: 'starch', fits: ['bowl', 'egg'], max: 300 }
+};
+function foodHour(date, hour) {
+  if (isFinite(Number(hour)) && hour !== null && hour !== '') return Number(hour);
+  const now = new Date();
+  const today = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0') + '-' + String(now.getDate()).padStart(2, '0');
+  return date === today ? now.getHours() + now.getMinutes() / 60 : 12;
 }
-function closeGaps(report, date) {
+function slotLabel(id) {
+  const sl = slotById(id);
+  return sl ? sl.label : (id === 'snacks' ? 'Snacks' : id === 'supps' ? 'Supplements' : '');
+}
+function comboLabel(units) {
+  const order = [], by = {};
+  for (const u of units) { if (!by[u.meal]) { by[u.meal] = []; order.push(u.meal); } by[u.meal].push(u.label); }
+  return order.map(m => by[m].join(', ') + (m === 'snacks' ? (by[m].length > 1 ? ' as snacks' : ' as a snack') : m === 'supps' ? '' : ' at ' + slotLabel(m))).join(' · ');
+}
+function closeGaps(report, date, hour) {
   const day = report.day || blankFoodDay();
-  if (!day.items.length) return { gaps: [], ideas: [], assumed: '' };
+  if (!day.items.length) return { gaps: [], ideas: [], assumed: '', status: 'empty' };
+  const h = foodHour(date, hour);
   const base = Object.assign({}, report.sum || {});
-  let assumed = '';
-  if (!(day.sel && day.sel.bowl) && !day.items.some(i => i.meal === 'bowl')) {
-    const oid = defaultOption('bowl', date);
-    const o = optionById(oid);
-    if (o) {
-      const add = optionNutrients(o);
+  const had = {};
+  for (const it of day.items) if (it.id) had[it.id] = (had[it.id] || 0) + (Number(it.g) || 0);
+  function assume(items) {
+    for (const it of items) {
+      const add = itemNutrients({ id: it.id, g: it.g });
       for (const k of ALL_KEYS) base[k] = (base[k] || 0) + (add[k] || 0);
-      assumed = o.name;
+      had[it.id] = (had[it.id] || 0) + it.g;
     }
+  }
+  const isPicked = id => (day.sel && day.sel[id]) || day.items.some(i => i.meal === id && !i.extra);
+  const bowlOn = isPicked('bowl');
+  const evening = h >= SLOT_END.bowl || (bowlOn && h >= 17);
+  const upcoming = SLOTS.map(s => s.id).filter(id => !evening && h < (SLOT_END[id] || 24));
+  // count the plan for meals still to come that aren't picked yet (today's rotation for Meal 3)
+  const assumedList = [];
+  for (const id of upcoming) {
+    if (isPicked(id)) continue;
+    const o = optionById(defaultOption(id, date));
+    if (!o) continue;
+    assume(o.items);
+    assumedList.push((id === 'bowl' ? '' : slotLabel(id) + ': ') + o.name);
+  }
+  const assumed = assumedList.join(' · ');
+  // daily supplements are taken every day: count them if not ticked yet
+  let assumedSupps = false;
+  if (!day.items.some(i => i.meal === 'supps')) {
+    for (const o of SUPP_OPTS) assume(o.items);
+    assumedSupps = SUPP_OPTS.length > 0;
   }
   const goals = [];
   for (const n of NUTS) if (n.key !== 'K2_ug') goals.push({ key: n.key, name: n.name, target: SILLZ[n.key], w: 1 });
   goals.push({ key: 'protein_g', name: 'Protein', target: TARGETS.protein, w: 1.5 });
   goals.push({ key: 'fibre_g', name: 'Fibre', target: TARGETS.fibre || 30, w: 1.2 });
-  const gaps = goals.filter(gl => (base[gl.key] || 0) < gl.target);
+  const gaps = goals.filter(gl => (base[gl.key] || 0) < gl.target * 0.995);
   const k2 = NUTS.some(n => n.key === 'K2_ug') ? nutrientPct(base.K2_ug || 0, SILLZ.K2_ug) : 100;
-  const out = { gaps: gaps.map(gl => ({ key: gl.key, name: gl.name, pct: nutrientPct(base[gl.key] || 0, gl.target) })), ideas: [], assumed, k2 };
+  const out = { gaps: gaps.map(gl => ({ key: gl.key, name: gl.name, pct: nutrientPct(base[gl.key] || 0, gl.target) })), ideas: [], assumed, assumedSupps, k2, evening, next: upcoming[0] || '', status: gaps.length ? 'gaps' : 'done' };
   if (!gaps.length) return out;
   const units = [];
   for (const p of (FOOD_PLAN.pantry || [])) {
     if (!LIB[p.id]) continue;
-    if (p.daily && day.items.some(i => i.id === p.id)) continue;
+    const meta = PANTRY_META[p.id] || { kind: 'snack', group: p.id };
+    if ((p.daily || meta.kind === 'supp') && had[p.id]) continue;
+    let meal = '';
+    if (meta.kind === 'supp') meal = 'supps';
+    else {
+      meal = (meta.fits || []).find(s => upcoming.indexOf(s) !== -1) || '';
+      if (!meal && meta.kind === 'snack') meal = 'snacks';
+    }
+    if (!meal) continue; // a meal-only food once its meals are past
     for (let n = 1; n <= (p.max || 1); n++) {
       const g = p.step * n;
+      if (meta.max && (had[p.id] || 0) + g > meta.max) break;
       const nut = itemNutrients({ id: p.id, g });
-      units.push({ id: p.id, g, n, label: (p.labels && p.labels[n - 1]) || (g + ' ' + (LIB[p.id].unit || 'g') + ' ' + LIB[p.id].short.toLowerCase()), nut });
+      if (evening && meta.kind !== 'supp' && nut.kcal > 250) break;
+      const base1 = (p.labels && p.labels[n - 1]) || (g + ' ' + (LIB[p.id].unit || 'g') + ' ' + LIB[p.id].short.toLowerCase());
+      units.push({ id: p.id, g, n, meal, group: meta.group || p.id, again: !!had[p.id], label: (had[p.id] ? (/^\d/.test(base1) ? '+' : /^a /.test(base1) ? 'another ' : 'extra ') + base1.replace(/^a /, '') : base1), nut });
     }
   }
   const kcalCap = (TARGETS.kcal || 2700) * 1.08;
@@ -482,10 +583,17 @@ function closeGaps(report, date) {
     const tot = {};
     for (const k of ALL_KEYS) tot[k] = base[k] || 0;
     for (const u of list) for (const k of ALL_KEYS) tot[k] += u.nut[k] || 0;
-    for (const gl of gaps) s += gl.w * (Math.min(1, tot[gl.key] / gl.target) - Math.min(1, (base[gl.key] || 0) / gl.target));
-    for (const k of Object.keys(UPPER)) if (tot[k] > UPPER[k] && tot[k] > (base[k] || 0)) s -= 2 * (tot[k] - Math.max(UPPER[k], base[k] || 0)) / UPPER[k] + 0.5;
+    for (const k of Object.keys(UPPER)) if (tot[k] > UPPER[k] && tot[k] > (base[k] || 0)) return { s: -9, tot };
+    let gain = 0;
+    for (const gl of gaps) gain += gl.w * (Math.min(1, tot[gl.key] / gl.target) - Math.min(1, (base[gl.key] || 0) / gl.target));
+    if (gain < 0.03) return { s: -1, tot };
+    s += gain;
     if (tot.kcal > kcalCap) s -= 0.6 * (tot.kcal - Math.max(kcalCap, base.kcal || 0)) / 250;
-    s -= 0.015 * list.length;
+    for (const u of list) {
+      s -= 0.04 + (u.again ? 0.02 : 0) + 0.012 * (u.nut.kcal || 0) / 100;
+      if (u.meal === out.next) s += 0.03;
+      else if (u.meal !== 'snacks' && u.meal !== 'supps') s += 0.015;
+    }
     return { s, tot };
   }
   const singles = units.map(u => ({ list: [u], r: score([u]) })).filter(x => x.r.s > 0.01);
@@ -504,20 +612,25 @@ function closeGaps(report, date) {
   const picked = [];
   for (const c of combos) {
     if (picked.length >= 3) break;
-    const key = c.list.map(u => u.id).sort().join();
-    if (picked.some(p => p.key === key)) continue;
+    if (c.r.s <= 0.01) break;
     const ids = c.list.map(u => u.id);
-    if (picked.some(p => p.list.every(u => ids.indexOf(u.id) !== -1))) continue;
-    picked.push({ key, list: c.list, r: c.r });
+    const groups = c.list.map(u => u.group).sort().join();
+    if (picked.some(p => p.list.some(u => ids.indexOf(u.id) !== -1))) continue; // no shared food across the top 3
+    if (picked.some(p => p.groups === groups)) continue; // no near-duplicates (e.g. blueberries vs raspberries)
+    picked.push({ list: c.list, r: c.r, groups });
   }
   out.ideas = picked.map(p => {
-    const closes = [], helps = [];
+    const closes = [], helps = [], moves = [];
     for (const gl of gaps) {
       const before = (base[gl.key] || 0) / gl.target, after = p.r.tot[gl.key] / gl.target;
+      if (after - before < 0.03) continue;
+      moves.push({ name: gl.name, before: Math.round(before * 100), after: Math.round(after * 100), d: Math.min(1, after) - before });
       if (after >= 1) closes.push(gl.name);
-      else if (after - before >= 0.05) helps.push(gl.name + ' +' + Math.round((after - before) * 100) + '%');
+      else helps.push(gl.name + ' +' + Math.round((after - before) * 100) + '%');
     }
-    return { label: comboLabel(p.list), items: p.list.map(u => ({ id: u.id, g: u.g })), closes, helps, kcal: Math.round(p.list.reduce((a, u) => a + (u.nut.kcal || 0), 0)), score: p.r.s };
+    moves.sort((a, b) => b.d - a.d);
+    const why = moves.slice(0, 2).map(m => m.name + ' ' + m.before + '% → ' + m.after + '%').join(' · ');
+    return { label: comboLabel(p.list), items: p.list.map(u => ({ id: u.id, g: u.g, meal: u.meal })), closes, helps, why, kcal: Math.round(p.list.reduce((a, u) => a + (u.nut.kcal || 0), 0)), score: p.r.s };
   });
   return out;
 }
@@ -554,7 +667,7 @@ function selectOption(state, date, optId) {
     return { change: hit.opt.name + ' added' };
   }
   if (day.sel[meal] === optId && day.items.some(i => i.meal === meal)) return {};
-  day.items = day.items.filter(i => i.meal !== meal);
+  day.items = day.items.filter(i => i.meal !== meal || i.extra);
   day.skip = day.skip.filter(k => k.indexOf(meal + ':') !== 0);
   day.sel[meal] = optId;
   for (const it of hit.opt.items) if (day.items.length < MAX_ITEMS) day.items.push(Object.assign(makeItem({ id: it.id, g: it.g, slot: '' }, meal), { opt: optId }));
@@ -567,7 +680,7 @@ function unselectOption(state, date, optId) {
   const before = day.items.length;
   if (hit.meal === 'snacks' || hit.meal === 'supps') day.items = day.items.filter(i => i.opt !== optId);
   else if (day.sel[hit.meal] === optId) {
-    day.items = day.items.filter(i => i.meal !== hit.meal);
+    day.items = day.items.filter(i => i.meal !== hit.meal || i.extra);
     delete day.sel[hit.meal];
   }
   return day.items.length === before ? {} : { change: hit.opt.name + ' removed' };
@@ -657,8 +770,11 @@ function applyOne(state, action, date) {
     if (!id || !g) return { skip: 'Unknown food' };
     const day = ensureDay(state, date);
     if (day.items.length >= MAX_ITEMS) return { skip: 'Too many foods today' };
-    day.items.push(makeItem({ id, g, slot: '' }, 'snacks'));
-    return { change: foodName(id) + ' added' };
+    const meal = action.meal === 'supps' ? 'supps' : (slotById(action.meal) ? action.meal : 'snacks');
+    const item = makeItem({ id, g, slot: '' }, meal);
+    if (meal !== 'snacks' && meal !== 'supps') item.extra = true;
+    day.items.push(item);
+    return { change: foodName(id) + ' added' + (meal !== 'snacks' && meal !== 'supps' ? ' to ' + slotLabel(meal) : '') };
   }
   if (op === 'unselect_option') return unselectOption(state, date, String(action.option || action.id || ''));
   if (op === 'add_meal') {
