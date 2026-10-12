@@ -21,7 +21,7 @@ const PREFERRED = {};
 for (const id of FOOD_PLAN.preferred) PREFERRED[id] = 1;
 const MACRO_KEYS = ['kcal', 'protein_g', 'carbs_g', 'fat_g', 'fibre_g'];
 const ALL_KEYS = MACRO_KEYS.concat(NUTS.map(n => n.key));
-const EXCLUDE_RE = /natto|pumpkin|chia|sardine|almond|cacao|cocoa|brazil/i;
+const EXCLUDE_RE = /natto|pumpkin|chia|sardine|almond|brazil/i;
 const OLD_PROTEIN = { mince: 'beef_mince', thigh: 'chicken_thigh', salmon: 'salmon_wild', venison: 'venison', bison: 'bison', steak: 'steak' };
 const OLD_FRUIT = { kiwi: 'kiwi_gold', mango: 'mango', banana: 'banana', apple: 'apple', mandarin: 'mandarin', orange: 'orange', pineapple: 'pineapple' };
 let _uidn = 0;
@@ -61,6 +61,7 @@ function mealIdOf(v) {
   if (s === 'bowl' || s === 'third' || s === 'dinner' || s === 'proteinbowl') return 'bowl';
   if (s === 'snacks' || s === 'snack' || s === 'drinks' || s === 'snacksdrinks') return 'snacks';
   if (s === 'supps' || s === 'supplements' || s === 'supplement' || s === 'supp') return 'supps';
+  if (s === 'wake' || s === 'wakeup' || s === 'pretraining' || s === 'meal0') return 'wake';
   if (s === 'meal1') return 'yoghurt';
   if (s === 'meal2') return 'egg';
   if (s === 'meal3') return 'bowl';
