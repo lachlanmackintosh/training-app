@@ -13,6 +13,14 @@ const SWAPS = FOOD_PLAN.swaps;
 const SILLZ = FOOD_PLAN.sillz;
 const NUTS = FOOD_PLAN.nutrients;
 const TARGETS = FOOD_PLAN.targets;
+const SLOTS = FOOD_PLAN.slots || [];
+const SNACK_OPTS = FOOD_PLAN.snacks || [];
+const SUPP_OPTS = FOOD_PLAN.supplements || [];
+const OPTS = {};
+for (const sl of SLOTS) for (const o of sl.options) OPTS[o.id] = { opt: o, meal: sl.id };
+for (const o of SNACK_OPTS) OPTS[o.id] = { opt: o, meal: 'snacks' };
+for (const o of SUPP_OPTS) OPTS[o.id] = { opt: o, meal: 'supps' };
+for (const o of (FOOD_PLAN.bumps || [])) OPTS[o.id] = { opt: Object.assign({ method: 'Extra portion to close a gap.', tags: 'bump' }, o), meal: 'snacks' };
 const PREFERRED = {};
 for (const id of FOOD_PLAN.preferred) PREFERRED[id] = 1;
 const MACRO_KEYS = ['kcal', 'protein_g', 'carbs_g', 'fat_g', 'fibre_g'];
@@ -22,7 +30,7 @@ const OLD_PROTEIN = { mince: 'beef_mince', thigh: 'chicken_thigh', salmon: 'salm
 const OLD_FRUIT = { kiwi: 'kiwi_gold', mango: 'mango', banana: 'banana', apple: 'apple', mandarin: 'mandarin', orange: 'orange', pineapple: 'pineapple' };
 let _uidn = 0;
 
-function blankFoodDay() { return { items: [], skip: [] }; }
+function blankFoodDay() { return { items: [], skip: [], sel: {} }; }
 function isExcludedFood(id, name) { return EXCLUDE_RE.test(String(id || '')) || EXCLUDE_RE.test(String(name || '')); }
 function cleanFoodName(v) {
   return String(v == null ? '' : v).replace(/[\u0000-\u001f]+/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 80);
@@ -56,6 +64,10 @@ function mealIdOf(v) {
   if (s === 'egg' || s === 'eggs' || s === 'lunch' || s === 'eggmeal') return 'egg';
   if (s === 'bowl' || s === 'third' || s === 'dinner' || s === 'proteinbowl') return 'bowl';
   if (s === 'snacks' || s === 'snack' || s === 'drinks' || s === 'snacksdrinks') return 'snacks';
+  if (s === 'supps' || s === 'supplements' || s === 'supplement' || s === 'supp') return 'supps';
+  if (s === 'meal1') return 'yoghurt';
+  if (s === 'meal2') return 'egg';
+  if (s === 'meal3') return 'bowl';
   for (const m of MEALS) if (m.id === raw || m.name.toLowerCase() === raw) return m.id;
   return '';
 }
@@ -177,7 +189,9 @@ function sanitiseItem(raw, seen) {
   seen[uid] = 1;
   const meal = mealIdOf(raw.meal);
   const slot = slotIdOf(raw.slot);
-  return { uid, id, g, meal, slot, edited: !!raw.edited };
+  const out = { uid, id, g, meal, slot, edited: !!raw.edited };
+  if (typeof raw.opt === 'string' && OPTS[raw.opt]) out.opt = raw.opt;
+  return out;
 }
 function legacyCustom(c) {
   if (!c || typeof c !== 'object' || c.eaten === false) return null;
@@ -278,6 +292,12 @@ function normaliseFoodDay(raw, picks, snackSel) {
       if (day.items.length >= MAX_ITEMS) break;
       const clean = sanitiseItem(item, seen);
       if (clean) day.items.push(clean);
+    }
+    if (raw.sel && typeof raw.sel === 'object') {
+      for (const sl of SLOTS) {
+        const v = raw.sel[sl.id];
+        if (typeof v === 'string' && OPTS[v] && OPTS[v].meal === sl.id) day.sel[sl.id] = v;
+      }
     }
     if (Array.isArray(raw.skip)) {
       for (const s of raw.skip) {
@@ -398,7 +418,8 @@ function dayReport(st, date) {
     { key: 'kcal', name: 'Calories', value: macros.kcal, target: TARGETS.kcal, unit: '', pct: nutrientPct(macros.kcal, TARGETS.kcal) },
     { key: 'p', name: 'Protein', value: macros.p, target: TARGETS.protein, unit: 'g', pct: nutrientPct(macros.p, TARGETS.protein) },
     { key: 'c', name: 'Carbs', value: macros.c, target: TARGETS.carbs, unit: 'g', pct: nutrientPct(macros.c, TARGETS.carbs) },
-    { key: 'f', name: 'Fat', value: macros.f, target: TARGETS.fat, unit: 'g', pct: nutrientPct(macros.f, TARGETS.fat) }
+    { key: 'f', name: 'Fat', value: macros.f, target: TARGETS.fat, unit: 'g', pct: nutrientPct(macros.f, TARGETS.fat) },
+    { key: 'fib', name: 'Fibre', value: sum.fibre_g, target: TARGETS.fibre || 30, unit: 'g', pct: nutrientPct(sum.fibre_g, TARGETS.fibre || 30) }
   ];
   for (const b of macroBars) b.hit = b.pct >= 100;
   const nutrients = NUTS.map(n => {
@@ -412,10 +433,44 @@ function dayReport(st, date) {
     return copy;
   });
   lows.sort((a, b) => a.pct - b.pct || a.name.localeCompare(b.name));
-  return {
+  const out = {
     hasLog: day.items.length > 0, estimate, macros, targets: TARGETS, macroBars,
-    nutrients, lows, hard: nutrients.filter(n => n.hard), day, picks: state.picks
+    nutrients, lows, hard: nutrients.filter(n => n.hard), day, picks: state.picks, sum
   };
+  out.gaps = closeGaps(out);
+  return out;
+}
+/* Rank snacks, supplements and portion bumps by how many under-100% targets they close. */
+function closeGaps(report) {
+  const day = report.day || blankFoodDay();
+  const sum = report.sum || {};
+  const gaps = [];
+  for (const b of report.macroBars) if (b.key === 'p' || b.key === 'fib') if (b.pct < 100) gaps.push({ key: b.key === 'p' ? 'protein_g' : 'fibre_g', name: b.name, target: b.target, value: b.value, hard: false });
+  for (const n of report.nutrients) if (n.pct < 100) gaps.push({ key: n.key, name: n.name, target: n.target, value: n.value, hard: n.hard });
+  if (!gaps.length) return { gaps: [], ideas: [] };
+  const cands = [];
+  for (const o of SNACK_OPTS.concat(SUPP_OPTS)) {
+    if (day.items.some(i => i.opt === o.id)) continue;
+    cands.push({ id: o.id, label: o.name, kind: 'option', items: o.items });
+  }
+  for (const b of (FOOD_PLAN.bumps || [])) if (!day.items.some(i => i.opt === b.id)) cands.push({ id: b.id, label: b.name, kind: 'option', items: b.items });
+  const ideas = [];
+  for (const c of cands) {
+    const add = sumNutrients(c.items.map(it => itemNutrients({ id: it.id, g: it.g })));
+    let fixes = 0, gain = 0;
+    const names = [];
+    for (const gp of gaps) {
+      const a = add[gp.key] || 0;
+      if (!(a > 0)) continue;
+      const before = Math.min(1, gp.value / gp.target), after = Math.min(1, (gp.value + a) / gp.target);
+      if (after - before < 0.03) continue;
+      gain += after - before;
+      if (after >= 1) { fixes++; names.push(gp.name); } else names.push(gp.name + ' +' + Math.round((after - before) * 100) + '%');
+    }
+    if (gain > 0) ideas.push({ id: c.id, label: c.label, kind: c.kind, fixes, gain, names });
+  }
+  ideas.sort((a, b) => b.fixes - a.fixes || b.gain - a.gain);
+  return { gaps: gaps.map(gp => ({ key: gp.key, name: gp.name, pct: nutrientPct(gp.value, gp.target), hard: gp.hard })), ideas: ideas.slice(0, 5) };
 }
 function lowReply(st, date) {
   const r = dayReport(st, date);
@@ -426,21 +481,23 @@ function lowReply(st, date) {
   });
   let text = lines.length ? lines.join('. ') + '.' : 'The Sillz targets you can hit with food are covered.';
   const hardLow = r.hard.filter(h => !h.hit);
-  if (hardLow.length) text += ' Vitamin D and K2 are the known hard ones: K2 is about 12% without natto, and vitamin D needs sun or salmon.';
+  if (hardLow.length) text += ' K2 is the known gap: about 65% with the drops, without natto.';
   return text;
 }
 function macroReply(st, date, which) {
   const r = dayReport(st, date);
   if (which === 'kcal') {
     const left = r.targets.kcal - r.macros.kcal;
-    if (!r.hasLog) return 'Nothing logged yet. The day is about 2,750 kcal.';
-    if (left >= 0) return 'About ' + Math.round(left) + ' kcal left of the 2,750 kcal day.';
-    return 'About ' + Math.round(-left) + ' kcal over the 2,750 kcal day.';
+    const k = r.targets.kcal.toLocaleString('en-AU');
+    if (!r.hasLog) return 'Nothing logged yet. The day is about ' + k + ' kcal.';
+    if (left >= 0) return 'About ' + Math.round(left) + ' kcal left of the ' + k + ' kcal day.';
+    return 'About ' + Math.round(-left) + ' kcal over the ' + k + ' kcal day.';
   }
   const left = r.targets.protein - r.macros.p;
-  if (!r.hasLog) return 'Nothing logged yet. Protein target is 178 g.';
-  if (left >= 0) return 'Protein left today is about ' + Math.round(left) + ' g of the 178 g target.';
-  return 'Protein is about ' + Math.round(-left) + ' g over the 178 g target.';
+  const pt = r.targets.protein;
+  if (!r.hasLog) return 'Nothing logged yet. Protein target is ' + pt + ' g.';
+  if (left >= 0) return 'Protein left today is about ' + Math.round(left) + ' g of the ' + pt + ' g target.';
+  return 'Protein is about ' + Math.round(-left) + ' g over the ' + pt + ' g target.';
 }
 function localFoodAnswer(text, st, date) {
   const t = String(text || '').toLowerCase();
@@ -453,6 +510,56 @@ function localFoodAnswer(text, st, date) {
   return '';
 }
 
+function optionById(id) { return OPTS[id] ? OPTS[id].opt : null; }
+function slotById(id) { for (const sl of SLOTS) if (sl.id === id) return sl; return null; }
+function rotationNight(date) {
+  const d = /^\d{4}-\d{2}-\d{2}$/.test(String(date || '')) ? new Date(Number(date.slice(0, 4)), Number(date.slice(5, 7)) - 1, Number(date.slice(8, 10)), 12) : new Date();
+  const wd = d.getDay();
+  return wd === 0 ? 7 : wd;
+}
+function defaultOption(slotId, date) {
+  const sl = slotById(slotId);
+  if (!sl || !sl.options.length) return '';
+  if (slotId === 'bowl') {
+    const n = rotationNight(date);
+    const hit = sl.options.find(o => o.tags === 'night ' + n);
+    if (hit) return hit.id;
+  }
+  return sl.options[0].id;
+}
+function optionNutrients(opt) {
+  if (!opt) return sumNutrients([]);
+  return sumNutrients(opt.items.map(it => itemNutrients({ id: it.id, g: it.g })));
+}
+function selectOption(state, date, optId) {
+  const hit = OPTS[optId];
+  if (!hit) return { skip: 'Unknown meal option' };
+  const day = ensureDay(state, date);
+  const meal = hit.meal;
+  if (meal === 'snacks' || meal === 'supps') {
+    if (day.items.some(i => i.opt === optId)) return {};
+    for (const it of hit.opt.items) if (day.items.length < MAX_ITEMS) day.items.push(Object.assign(makeItem({ id: it.id, g: it.g, slot: '' }, meal), { opt: optId }));
+    return { change: hit.opt.name + ' added' };
+  }
+  if (day.sel[meal] === optId && day.items.some(i => i.meal === meal)) return {};
+  day.items = day.items.filter(i => i.meal !== meal);
+  day.skip = day.skip.filter(k => k.indexOf(meal + ':') !== 0);
+  day.sel[meal] = optId;
+  for (const it of hit.opt.items) if (day.items.length < MAX_ITEMS) day.items.push(Object.assign(makeItem({ id: it.id, g: it.g, slot: '' }, meal), { opt: optId }));
+  return { change: slotById(meal).label + ': ' + hit.opt.name };
+}
+function unselectOption(state, date, optId) {
+  const hit = OPTS[optId];
+  if (!hit) return { skip: 'Unknown meal option' };
+  const day = ensureDay(state, date);
+  const before = day.items.length;
+  if (hit.meal === 'snacks' || hit.meal === 'supps') day.items = day.items.filter(i => i.opt !== optId);
+  else if (day.sel[hit.meal] === optId) {
+    day.items = day.items.filter(i => i.meal !== hit.meal);
+    delete day.sel[hit.meal];
+  }
+  return day.items.length === before ? {} : { change: hit.opt.name + ' removed' };
+}
 function upsertFood(state, date, spec) {
   const id = resolveFoodId(spec.id);
   if (!id) return { skip: 'Unknown food' };
@@ -531,9 +638,21 @@ function applyOne(state, action, date) {
   if (op === 'add' || op === 'update') return upsertFood(state, date, action);
   if (op === 'remove' || op === 'delete') return removeFood(state, date, action);
   if (op === 'add_estimate') return addEstimate(state, date, action);
+  if (op === 'select_option') return selectOption(state, date, String(action.option || action.id || ''));
+  if (op === 'unselect_option') return unselectOption(state, date, String(action.option || action.id || ''));
   if (op === 'add_meal') {
     const meal = mealIdOf(action.meal);
     if (!meal) return { skip: 'Unknown meal' };
+    if (slotById(meal)) {
+      const day = ensureDay(state, date);
+      const want = action.option && OPTS[action.option] && OPTS[action.option].meal === meal ? action.option : (day.sel[meal] || defaultOption(meal, date));
+      return selectOption(state, date, want);
+    }
+    if (meal === 'snacks' || meal === 'supps') {
+      const list = meal === 'snacks' ? SNACK_OPTS.filter(o => o.tags === 'daily') : SUPP_OPTS;
+      const done = list.map(o => selectOption(state, date, o.id)).filter(r => r.change);
+      return done.length ? { change: (meal === 'snacks' ? 'Daily drinks' : 'Supplements') + ' logged' } : {};
+    }
     const on = aiOn(action.mushrooms);
     if (meal === 'egg' && on === true) state.picks.mushrooms = true;
     if (meal === 'egg' && on === false) {
@@ -549,6 +668,7 @@ function applyOne(state, action, date) {
     const day = ensureDay(state, date);
     const before = day.items.length;
     day.items = day.items.filter(i => i.meal !== meal);
+    if (day.sel) delete day.sel[meal];
     if (day.items.length === before) return {};
     return { change: mealById(meal).name + ' cleared' };
   }
@@ -659,14 +779,11 @@ function foodAiContext(st, date) {
     })),
     low: report.lows.map(n => ({ name: n.name, pct: n.pct, suggestions: n.suggestions.map(s => s.label) })),
     hard: report.hard.filter(h => !h.hit).map(h => ({ name: h.name, pct: h.pct, note: h.note })),
-    meals: MEALS.map(m => {
-      const plan = resolveMeal(m, state.picks);
-      return { id: m.id, name: m.name, items: plan.items.map(it => ({ id: it.id, grams: it.g })), optional: plan.optional.map(it => ({ id: it.id, grams: it.g })) };
-    }),
-    swaps: {
-      protein: SWAPS.protein.ids, carb: SWAPS.carb.ids, cheese: SWAPS.cheese.ids,
-      fat: SWAPS.fat.ids, milk: SWAPS.milk.ids, fruit: SWAPS.fruit.ids
-    }
+
+    selected: day.sel || {},
+    options: SLOTS.map(sl => ({ meal: sl.id, label: sl.label, options: sl.options.map(o => ({ id: o.id, name: o.name })) })),
+    snacks: SNACK_OPTS.map(o => ({ id: o.id, name: o.name })),
+    supplements: SUPP_OPTS.map(o => ({ id: o.id, name: o.name }))
   };
 }
 function foodAiSystem(st, date) {
@@ -674,18 +791,19 @@ function foodAiSystem(st, date) {
   return [
     'You are Ask AI in Lockie\'s training app. He tells you what he ate, or asks about today. Reply in Australian English. One or two short sentences. Say yoghurt, not yogurt.',
     'Call update_food every time. The reply is what he reads. The actions list is the only way to change the log. Use an empty actions list for questions. Never claim a change that is not in actions.',
-    'The app multiplies the food library by grams. Never invent calorie or nutrient totals. If he asks what he is low on, answer from TODAY.low and TODAY.hard only. K2 and vitamin D are known hard gaps: mention the note, do not nag.',
+    'The app multiplies the food library by grams. Never invent calorie or nutrient totals. If he asks what he is low on, answer from TODAY.low and TODAY.hard only. K2 is the known hard gap: mention the note, do not nag.',
     'Library ids (id | name | default grams):',
     libraryLines(),
     'Operations. food id must be a library id. grams are the amount he ate, not per 100 g:',
-    '{"op":"add","id":"<id>","grams":0,"meal":"yoghurt|egg|bowl|snacks"} — sets that food to this amount. Does not stack on what is already logged.',
+    '{"op":"add","id":"<id>","grams":0,"meal":"yoghurt|egg|bowl|snacks|supps"} — sets that food to this amount. Does not stack on what is already logged.',
     '{"op":"update","id":"<id>","grams":0,"meal":"..."}',
     '{"op":"remove","id":"<id>","meal":"..."} — skip that food. Use this for "no mushrooms" (id uv_mushrooms, meal egg).',
-    '{"op":"add_meal","meal":"yoghurt|egg|bowl|snacks","mushrooms":false} — log the current plate. Mushrooms are optional and off unless he includes them.',
-    '{"op":"set_swap","slot":"protein|carb|cheese|fat|milk|fruit","id":"<id from TODAY.swaps>"} — mango instead of kiwi is slot fruit, id mango.',
+    '{"op":"select_option","option":"<option id from TODAY.options, TODAY.snacks or TODAY.supplements>"} — log a whole meal option (replaces that meal slot) or add a snack/supplement. Prefer this when he names a meal from the menu (e.g. "had the burrito bowl for dinner").',
+    '{"op":"unselect_option","option":"<id>"} — remove a selected option or snack.',
+    '{"op":"add_meal","meal":"yoghurt|egg|bowl|snacks|supps"} — log the selected (or default) option for that slot. snacks = the four daily drinks; supps = cod liver oil + D3+K2.',
     '{"op":"add_estimate","name":"...","grams":0,"kcal":0,"protein_g":0,"carbs_g":0,"fat_g":0} — only for food that is not in the library. Values are for the amount he ate. Add a micronutrient field only when you can give a fair number. The app marks it as an estimate.',
     'Do not add natto, pumpkin seeds, chia, sardines, almonds, cacao, or Brazil nuts. They are not in this plan. If he mentions pumpkin seeds, ignore them.',
-    'Brekkie is the yoghurt bowl (berries already include blackberries). Lunch is the egg meal. Dinner is the protein bowl. Snacks are seasonal fruit, carrot, orange juice, bone broth, and milk.',
+    'Meal slots: yoghurt = Breakfast (Meal 1), egg = Lunch (Meal 2), bowl = Dinner (Meal 3, a 7-night rotation). Snacks & drinks and supplements add on top. Use the option ids in TODAY.options.',
     'No markdown. Do not undo; the app has Undo.',
     'TODAY:',
     JSON.stringify(today)
@@ -705,10 +823,11 @@ const FOOD_AI_TOOL = {
         items: {
           type: 'OBJECT',
           properties: {
-            op: { type: 'STRING', enum: ['add', 'remove', 'update', 'add_meal', 'clear_meal', 'set_swap', 'set_mushrooms', 'add_estimate'] },
+            op: { type: 'STRING', enum: ['add', 'remove', 'update', 'add_meal', 'clear_meal', 'select_option', 'unselect_option', 'set_swap', 'set_mushrooms', 'add_estimate'] },
             id: { type: 'STRING' },
+            option: { type: 'STRING' },
             grams: { type: 'NUMBER' },
-            meal: { type: 'STRING', enum: ['yoghurt', 'egg', 'bowl', 'snacks'] },
+            meal: { type: 'STRING', enum: ['yoghurt', 'egg', 'bowl', 'snacks', 'supps'] },
             slot: { type: 'STRING', enum: ['protein', 'carb', 'cheese', 'fat', 'milk', 'fruit'] },
             mushrooms: { type: 'BOOLEAN' },
             on: { type: 'BOOLEAN' },
@@ -817,9 +936,12 @@ function mockGeminiFood(text) {
     actions.push({ op: 'add_meal', meal: 'egg', mushrooms: false });
     bits.push('Egg meal logged');
   }
-  if (/\b(dinner)\b/.test(t) || /protein bowl/.test(t)) {
+  if (/burrito/.test(t)) {
+    actions.push({ op: 'select_option', option: 'd3' });
+    bits.push('Burrito bowl logged');
+  } else if (/\b(dinner)\b/.test(t) || /protein bowl/.test(t)) {
     actions.push({ op: 'add_meal', meal: 'bowl' });
-    bits.push('Protein bowl logged');
+    bits.push('Dinner logged');
   }
   if (/\bsnacks?\b/.test(t)) {
     actions.push({ op: 'add_meal', meal: 'snacks' });
