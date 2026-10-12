@@ -28,7 +28,8 @@ function test(name, fn) {
 test('v6 plan has breakfast, lunch, dinner options, snacks and supplements', () => {
   const P = g.FOOD_PLAN;
   assert.strictEqual(P.slots.map(s => s.label).join(), 'Breakfast,Lunch,Dinner');
-  assert.strictEqual(P.slots[2].options.length, 7);
+  assert.strictEqual(P.slots[2].options.length, 10);
+  assert.strictEqual(P.slots[2].options.filter(o => o.tags === 'Slow cooker').length, 3);
   assert.ok(P.slots[2].options.some(o => /Pho/.test(o.name)));
   assert.ok(!P.slots[2].options.some(o => /lamb|mussel/i.test(o.name)));
   for (const sl of P.slots) for (const o of sl.options) {
@@ -162,7 +163,7 @@ test('old food storage migrates without the dropped foods', () => {
 
 test('service worker cache is the tracker build', () => {
   const sw = fs.readFileSync(path.join(root, 'sw.js'), 'utf8');
-  assert.ok(sw.indexOf("baki-v14-no-ai") !== -1);
+  assert.ok(sw.indexOf("baki-v15-slow-cooker") !== -1);
   assert.ok(sw.indexOf('./food-plan.js') !== -1);
   assert.ok(sw.indexOf('./food-log.js') !== -1);
 });
