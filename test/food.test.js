@@ -12,7 +12,7 @@ function load(file) {
 load('food-plan.js');
 load('food-log.js');
 const g = {};
-for (const name of ['FOOD_PLAN', 'applyFoodActions', 'sumNutrients', 'itemNutrients', 'dayReport', 'mealTickState', 'suggestionsFor', 'isExcludedFood', 'setItemGrams', 'loadFoodState', 'closeGaps']) {
+for (const name of ['FOOD_PLAN', 'applyFoodActions', 'sumNutrients', 'itemNutrients', 'dayReport', 'mealTickState', 'suggestionsFor', 'isExcludedFood', 'setItemGrams', 'loadFoodState', 'closeGaps', 'friendlyAmount']) {
   g[name] = vm.runInContext(name, context);
 }
 const DATE = '2026-10-10';
@@ -27,7 +27,7 @@ function test(name, fn) {
 
 test('v6 plan has breakfast, lunch, dinner options, snacks and supplements', () => {
   const P = g.FOOD_PLAN;
-  assert.strictEqual(P.slots.map(s => s.label).join(), 'Wake-up / pre-training,Breakfast,Lunch,Dinner');
+  assert.strictEqual(P.slots.map(s => s.label).join(), 'Morning snack,Meal 1,Meal 2,Meal 3');
   assert.strictEqual(P.slots[3].options.length, 10);
   assert.strictEqual(P.slots[3].options.filter(o => o.tags === 'Slow cooker').length, 3);
   assert.ok(P.slots[3].options.some(o => /Pho/.test(o.name)));
@@ -163,7 +163,7 @@ test('old food storage migrates without the dropped foods', () => {
 
 test('service worker cache is the tracker build', () => {
   const sw = fs.readFileSync(path.join(root, 'sw.js'), 'utf8');
-  assert.ok(sw.indexOf("baki-v16-wakeup") !== -1);
+  assert.ok(sw.indexOf("baki-v17-food-dash") !== -1);
   assert.ok(sw.indexOf('./food-plan.js') !== -1);
   assert.ok(sw.indexOf('./food-log.js') !== -1);
 });
@@ -193,6 +193,75 @@ test('suggester uses pantry foods only, ignores K2, assumes tonight\'s dinner', 
   const lean = g.applyFoodActions({}, [{ op: 'add_meal', meal: 'yoghurt' }, { op: 'add_meal', meal: 'supps' }], DATE).state;
   const rl = g.dayReport(lean, DATE);
   for (const i of rl.gaps.ideas) assert.ok(i.items.every(it => it.id !== 'beef_liver'));
+});
+
+test('friendly measures for herbs, spices, salad and fats; grams for protein and starch', () => {
+  const fa = g.friendlyAmount;
+  assert.strictEqual(fa('cinnamon', 2.6), '1 tsp');
+  assert.strictEqual(fa('cinnamon', 1.5), '½ tsp');
+  assert.strictEqual(fa('dark_choc', 15), '2 squares · 15 g');
+  assert.strictEqual(fa('garlic', 3), '1 clove');
+  assert.strictEqual(fa('cucumber', 60), '½ cucumber');
+  assert.strictEqual(fa('dill', 5), 'small handful');
+  assert.strictEqual(fa('evoo', 10), '2 tsp');
+  assert.strictEqual(fa('beef_liver', 20), '20 g');
+  assert.strictEqual(fa('rice', 150), '150 g');
+  assert.strictEqual(fa('greek_yoghurt', 300), '300 g');
+  // nutrition still uses the exact grams
+  const st = g.applyFoodActions({}, [{ op: 'select_option', option: 'b_berry' }], DATE).state;
+  const c = st.days[DATE].items.find(i => i.id === 'cinnamon');
+  assert.strictEqual(c.g, 2.6);
+  assert.strictEqual(g.loadFoodState(JSON.parse(JSON.stringify(st))).days[DATE].items.find(i => i.id === 'cinnamon').g, 2.6);
+});
+
+test('gap ideas are time-aware, diverse, explained and within upper limits', () => {
+  // Meal 1 without its whey: protein is short, Meal 2 is next
+  const base = g.applyFoodActions({}, [{ op: 'add_meal', meal: 'wake' }, { op: 'add_meal', meal: 'yoghurt' }, { op: 'remove', id: 'whey', meal: 'yoghurt' }], DATE).state;
+  const mid = g.dayReport(base, DATE, 11).gaps;
+  assert.ok(/Egg meal/.test(mid.assumed) && mid.assumedSupps);
+  assert.strictEqual(mid.next, 'egg');
+  assert.ok(mid.ideas.length >= 1 && mid.ideas.length <= 3);
+  const seen = {};
+  for (const i of mid.ideas) {
+    assert.ok(/\d+% → \d+%/.test(i.why), i.why);
+    for (const it of i.items) { assert.ok(!seen[it.id], 'no shared food across ideas: ' + it.id); }
+    for (const it of i.items) seen[it.id] = 1;
+    assert.ok(i.items.every(it => it.meal !== 'yoghurt'), 'Meal 1 is past at 11 am');
+    for (const it of i.items) assert.ok(['egg', 'bowl', 'snacks', 'supps'].indexOf(it.meal) !== -1, it.meal); // meals 1 is past
+  }
+  // evening, after Meal 3: small snacks/drinks only
+  // Meal 2 skipped, pho for Meal 3: evening ideas are small snacks/drinks only
+  const full = g.applyFoodActions({}, [{ op: 'add_meal', meal: 'wake' }, { op: 'add_meal', meal: 'yoghurt' }, { op: 'select_option', option: 'd7' }], DATE).state;
+  const eve = g.dayReport(full, DATE, 21).gaps;
+  assert.ok(eve.evening && eve.ideas.length >= 2);
+  for (const i of eve.ideas) for (const it of i.items) {
+    assert.ok(it.meal === 'snacks' || it.meal === 'supps', it.id);
+    assert.ok(['broccoli', 'potato', 'rice', 'egg', 'avocado'].indexOf(it.id) === -1, it.id);
+  }
+  // upper limits incl. manganese never pushed over by an idea
+  const UL = { manganese_mg: 11, iron_mg: 45, copper_mg: 10, A_ug: 3000, zinc_mg: 40 };
+  for (const hr of [8, 11, 15, 21]) {
+    const r = g.dayReport(full, DATE, hr);
+    for (const i of r.gaps.ideas) {
+      const add = g.sumNutrients(i.items.map(it => g.itemNutrients({ id: it.id, g: it.g })));
+      for (const k of Object.keys(UL)) assert.ok(r.sum[k] + add[k] <= Math.max(UL[k], r.sum[k] + 1e-9) + 1e-9 || add[k] === 0, k);
+    }
+  }
+  // repeat guard: eggs already at 300 g, never more than 400 g suggested
+  for (const i of mid.ideas) for (const it of i.items) if (it.id === 'egg') assert.ok(it.g <= 100);
+  for (const i of eve.ideas) for (const it of i.items) assert.ok(g.itemNutrients({ id: it.id, g: it.g }).kcal <= 250, it.id);
+});
+
+test('extras added to a meal survive picking that meal, and a full day needs nothing', () => {
+  let st = g.applyFoodActions({}, [{ op: 'add_more', id: 'broccoli', grams: 100, meal: 'bowl' }], DATE).state;
+  st = g.applyFoodActions(st, [{ op: 'select_option', option: 'd1' }], DATE).state;
+  const bro = st.days[DATE].items.filter(i => i.id === 'broccoli');
+  assert.ok(bro.some(i => i.extra && i.g === 100));
+  let all = { days: {} };
+  for (const meal of ['wake', 'yoghurt', 'egg', 'bowl', 'snacks', 'supps']) all = g.applyFoodActions(all, [{ op: 'add_meal', meal }], DATE).state;
+  const r = g.dayReport(all, DATE, 21).gaps;
+  assert.strictEqual(r.status, 'done');
+  assert.strictEqual(r.ideas.length, 0);
 });
 
 console.log('all food tests passed');
