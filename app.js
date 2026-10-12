@@ -663,7 +663,7 @@ function optMacroLine(o) {
   return `${comma(Math.round(n.kcal))} kcal · ${Math.round(n.protein_g)} g protein`;
 }
 function optRow(o, on, multi) {
-  return `<div class="optrow${on ? ' on' : ''}"><button type="button" class="optmain" data-act="opt-open" data-opt="${esc(o.id)}"><b>${esc(o.name)}</b><span class="muted small">${esc(optMacroLine(o))}${o.tags && o.tags.indexOf('night') === 0 ? ' · ' + esc(o.tags) : ''}</span></button>
+  return `<div class="optrow${on ? ' on' : ''}"><button type="button" class="optmain" data-act="opt-open" data-opt="${esc(o.id)}"><b>${esc(o.name)}</b><span class="muted small">${esc(optMacroLine(o))}${o.tags && (o.tags.indexOf('night') === 0 || o.tags === 'Slow cooker') ? ' · ' + esc(o.tags) : ''}</span></button>
     <button type="button" class="optpick${on ? ' on' : ''}" data-act="${on ? 'opt-remove' : 'opt-select'}" data-opt="${esc(o.id)}" aria-label="${on ? 'Remove' : 'Select'} ${esc(o.name)}">${on ? '✓' : (multi ? '+' : '○')}</button></div>`;
 }
 function slotCard(day, sl) {
