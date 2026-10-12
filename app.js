@@ -225,7 +225,7 @@ function renderHome() {
       <a class="btn" style="margin-top:14px" href="#/workout/${k}">${done ? 'Continue workout' : 'Start workout'}</a>`;
   } else if (k === 'H') {
     const pk = hiitPick(d), o = HIIT[pk];
-    todayHtml = `<div class="muted small">Today</div><h2 style="margin:4px 0 2px">HIIT</h2><div class="subt">This week: <b>${esc(o.name)}</b></div>
+    todayHtml = `<div class="muted small">Today</div><h2 style="margin:4px 0 2px">HIIT</h2><div class="subt">This week: <b>${esc(o.name)}${Array.isArray(o.season) ? ` <span class="seas${inSeason(o, todayStr()) ? ' in' : ''}">(${inSeason(o, todayStr()) ? 'in season' : 'out of season'})</span>` : ''}</b></div>
       <div class="muted small">${esc(o.desc)} · about ${mins(o.phases)} min · ${esc(GOALS[o.goal].label)}${bi.phase === 'deload' ? ' · Deload week: keep it easy' : ''}</div>
       <a class="btn" style="margin-top:14px" href="#/hiit/${pk}">Start ${esc(o.name)}</a>
       <a class="small" style="display:inline-block;margin-top:10px;min-height:36px;line-height:36px" href="#/hiit">See all HIIT sessions</a>`;
@@ -699,7 +699,7 @@ function logCard(day) {
 function renderMeals(st) {
   const day = normaliseFoodDay(st.days && st.days[todayStr()], st.picks);
   return dashHtml(st) + `<div class="sect">Meals</div>` + (FOOD_PLAN.slots || []).map(sl => slotCard(day, sl)).join('') +
-    multiCard(day, 'Snacks & drinks', FOOD_PLAN.snacks || [], 'Add as many as you have. The first three are the daily drinks.') +
+    multiCard(day, 'Snacks & drinks', snackOrder(FOOD_PLAN.snacks || [], todayStr()), 'Add as many as you have. The first three are the daily drinks.') +
     multiCard(day, 'Supplements', FOOD_PLAN.supplements || [], 'Daily, with Meal 1. Tap for how to take.') + logCard(day) +
     `<details class="card fold" data-keep="rules"><summary>How to eat this</summary><ul class="bul small">${FOOD_PLAN.rules.map(r => `<li>${esc(r)}</li>`).join('')}</ul></details>`;
 }
