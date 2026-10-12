@@ -1,10 +1,6 @@
-/* Ask AI food log. Pure helpers: no DOM, no network, no API key.
-   GEMINI_MODEL is the free-tier Flash id. Change this one line to swap models.
-   Oct 2026: gemini-3.8-flash is the current free Flash (gemini-2.5-flash still works on older keys).
-   The model returns add / remove / update operations. This file applies them.
-   Grams x the food library is the only maths. */
-const GEMINI_MODEL = 'gemini-3.8-flash';
-const GEMINI_URL = 'https://generativelanguage.googleapis.com/v1beta/models/' + GEMINI_MODEL + ':generateContent';
+/* Food log. Pure helpers: no DOM, no network.
+   Meal options, snacks and supplements are applied as add / remove / select operations.
+   Grams x the food library is the only maths. Built-in gap suggester (no AI) at closeGaps(). */
 const MAX_ACTIONS = 24;
 const MAX_ITEMS = 40;
 const LIB = FOOD_PLAN.library;
@@ -20,7 +16,7 @@ const OPTS = {};
 for (const sl of SLOTS) for (const o of sl.options) OPTS[o.id] = { opt: o, meal: sl.id };
 for (const o of SNACK_OPTS) OPTS[o.id] = { opt: o, meal: 'snacks' };
 for (const o of SUPP_OPTS) OPTS[o.id] = { opt: o, meal: 'supps' };
-for (const o of (FOOD_PLAN.bumps || [])) OPTS[o.id] = { opt: Object.assign({ method: 'Extra portion to close a gap.', tags: 'bump' }, o), meal: 'snacks' };
+
 const PREFERRED = {};
 for (const id of FOOD_PLAN.preferred) PREFERRED[id] = 1;
 const MACRO_KEYS = ['kcal', 'protein_g', 'carbs_g', 'fat_g', 'fibre_g'];
@@ -437,77 +433,92 @@ function dayReport(st, date) {
     hasLog: day.items.length > 0, estimate, macros, targets: TARGETS, macroBars,
     nutrients, lows, hard: nutrients.filter(n => n.hard), day, picks: state.picks, sum
   };
-  out.gaps = closeGaps(out);
+  out.gaps = closeGaps(out, date);
   return out;
 }
-/* Rank snacks, supplements and portion bumps by how many under-100% targets they close. */
-function closeGaps(report) {
+/* Built-in gap suggester (no AI). Pool = foods already on the plan / shopping list, in sensible steps (FOOD_PLAN.pantry).
+   Searches 1-3 item combos that close the most % gap: micros under 100% (K2 ignored), protein if short, fibre.
+   Penalises going over upper limits and big calorie overshoot. Before dinner is picked, tonight's rotation dinner is assumed. */
+const UPPER = { A_ug: 3000, selenium_ug: 400, zinc_mg: 40, iron_mg: 45, D_ug: 100 };
+function comboLabel(units) {
+  return units.map(u => u.label).join(' + ');
+}
+function closeGaps(report, date) {
   const day = report.day || blankFoodDay();
-  const sum = report.sum || {};
-  const gaps = [];
-  for (const b of report.macroBars) if (b.key === 'p' || b.key === 'fib') if (b.pct < 100) gaps.push({ key: b.key === 'p' ? 'protein_g' : 'fibre_g', name: b.name, target: b.target, value: b.value, hard: false });
-  for (const n of report.nutrients) if (n.pct < 100) gaps.push({ key: n.key, name: n.name, target: n.target, value: n.value, hard: n.hard });
-  if (!gaps.length) return { gaps: [], ideas: [] };
-  const cands = [];
-  for (const o of SNACK_OPTS.concat(SUPP_OPTS)) {
-    if (day.items.some(i => i.opt === o.id)) continue;
-    cands.push({ id: o.id, label: o.name, kind: 'option', items: o.items });
-  }
-  for (const b of (FOOD_PLAN.bumps || [])) if (!day.items.some(i => i.opt === b.id)) cands.push({ id: b.id, label: b.name, kind: 'option', items: b.items });
-  const ideas = [];
-  for (const c of cands) {
-    const add = sumNutrients(c.items.map(it => itemNutrients({ id: it.id, g: it.g })));
-    let fixes = 0, gain = 0;
-    const names = [];
-    for (const gp of gaps) {
-      const a = add[gp.key] || 0;
-      if (!(a > 0)) continue;
-      const before = Math.min(1, gp.value / gp.target), after = Math.min(1, (gp.value + a) / gp.target);
-      if (after - before < 0.03) continue;
-      gain += after - before;
-      if (after >= 1) { fixes++; names.push(gp.name); } else names.push(gp.name + ' +' + Math.round((after - before) * 100) + '%');
+  if (!day.items.length) return { gaps: [], ideas: [], assumed: '' };
+  const base = Object.assign({}, report.sum || {});
+  let assumed = '';
+  if (!(day.sel && day.sel.bowl) && !day.items.some(i => i.meal === 'bowl')) {
+    const oid = defaultOption('bowl', date);
+    const o = optionById(oid);
+    if (o) {
+      const add = optionNutrients(o);
+      for (const k of ALL_KEYS) base[k] = (base[k] || 0) + (add[k] || 0);
+      assumed = o.name;
     }
-    if (gain > 0) ideas.push({ id: c.id, label: c.label, kind: c.kind, fixes, gain, names });
   }
-  ideas.sort((a, b) => b.fixes - a.fixes || b.gain - a.gain);
-  return { gaps: gaps.map(gp => ({ key: gp.key, name: gp.name, pct: nutrientPct(gp.value, gp.target), hard: gp.hard })), ideas: ideas.slice(0, 5) };
-}
-function lowReply(st, date) {
-  const r = dayReport(st, date);
-  if (!r.hasLog) return 'Nothing logged yet. Tick a meal, or tell me what you ate.';
-  const lines = r.lows.slice(0, 4).map(n => {
-    const sug = n.suggestions.slice(0, 2).map(s => s.label).join(' or ');
-    return n.name + ' is at ' + n.pct + '%' + (sug ? '. ' + sug + ' would help' : '');
+  const goals = [];
+  for (const n of NUTS) if (n.key !== 'K2_ug') goals.push({ key: n.key, name: n.name, target: SILLZ[n.key], w: 1 });
+  goals.push({ key: 'protein_g', name: 'Protein', target: TARGETS.protein, w: 1.5 });
+  goals.push({ key: 'fibre_g', name: 'Fibre', target: TARGETS.fibre || 30, w: 1.2 });
+  const gaps = goals.filter(gl => (base[gl.key] || 0) < gl.target);
+  const k2 = NUTS.some(n => n.key === 'K2_ug') ? nutrientPct(base.K2_ug || 0, SILLZ.K2_ug) : 100;
+  const out = { gaps: gaps.map(gl => ({ key: gl.key, name: gl.name, pct: nutrientPct(base[gl.key] || 0, gl.target) })), ideas: [], assumed, k2 };
+  if (!gaps.length) return out;
+  const units = [];
+  for (const p of (FOOD_PLAN.pantry || [])) {
+    if (!LIB[p.id]) continue;
+    if (p.daily && day.items.some(i => i.id === p.id)) continue;
+    for (let n = 1; n <= (p.max || 1); n++) {
+      const g = p.step * n;
+      const nut = itemNutrients({ id: p.id, g });
+      units.push({ id: p.id, g, n, label: (p.labels && p.labels[n - 1]) || (g + ' ' + (LIB[p.id].unit || 'g') + ' ' + LIB[p.id].short.toLowerCase()), nut });
+    }
+  }
+  const kcalCap = (TARGETS.kcal || 2700) * 1.08;
+  function score(list) {
+    let s = 0;
+    const tot = {};
+    for (const k of ALL_KEYS) tot[k] = base[k] || 0;
+    for (const u of list) for (const k of ALL_KEYS) tot[k] += u.nut[k] || 0;
+    for (const gl of gaps) s += gl.w * (Math.min(1, tot[gl.key] / gl.target) - Math.min(1, (base[gl.key] || 0) / gl.target));
+    for (const k of Object.keys(UPPER)) if (tot[k] > UPPER[k] && tot[k] > (base[k] || 0)) s -= 2 * (tot[k] - Math.max(UPPER[k], base[k] || 0)) / UPPER[k] + 0.5;
+    if (tot.kcal > kcalCap) s -= 0.6 * (tot.kcal - Math.max(kcalCap, base.kcal || 0)) / 250;
+    s -= 0.015 * list.length;
+    return { s, tot };
+  }
+  const singles = units.map(u => ({ list: [u], r: score([u]) })).filter(x => x.r.s > 0.01);
+  singles.sort((a, b) => b.r.s - a.r.s);
+  const top = singles.slice(0, 14).map(x => x.list[0]);
+  const combos = singles.slice();
+  for (let i = 0; i < top.length; i++) for (let j = i + 1; j < top.length; j++) {
+    if (top[i].id === top[j].id) continue;
+    combos.push({ list: [top[i], top[j]], r: score([top[i], top[j]]) });
+    for (let k = j + 1; k < top.length; k++) {
+      if (top[k].id === top[i].id || top[k].id === top[j].id) continue;
+      combos.push({ list: [top[i], top[j], top[k]], r: score([top[i], top[j], top[k]]) });
+    }
+  }
+  combos.sort((a, b) => b.r.s - a.r.s);
+  const picked = [];
+  for (const c of combos) {
+    if (picked.length >= 3) break;
+    const key = c.list.map(u => u.id).sort().join();
+    if (picked.some(p => p.key === key)) continue;
+    const ids = c.list.map(u => u.id);
+    if (picked.some(p => p.list.every(u => ids.indexOf(u.id) !== -1))) continue;
+    picked.push({ key, list: c.list, r: c.r });
+  }
+  out.ideas = picked.map(p => {
+    const closes = [], helps = [];
+    for (const gl of gaps) {
+      const before = (base[gl.key] || 0) / gl.target, after = p.r.tot[gl.key] / gl.target;
+      if (after >= 1) closes.push(gl.name);
+      else if (after - before >= 0.05) helps.push(gl.name + ' +' + Math.round((after - before) * 100) + '%');
+    }
+    return { label: comboLabel(p.list), items: p.list.map(u => ({ id: u.id, g: u.g })), closes, helps, kcal: Math.round(p.list.reduce((a, u) => a + (u.nut.kcal || 0), 0)), score: p.r.s };
   });
-  let text = lines.length ? lines.join('. ') + '.' : 'The Sillz targets you can hit with food are covered.';
-  const hardLow = r.hard.filter(h => !h.hit);
-  if (hardLow.length) text += ' K2 is the known gap: about 65% with the drops, without natto.';
-  return text;
-}
-function macroReply(st, date, which) {
-  const r = dayReport(st, date);
-  if (which === 'kcal') {
-    const left = r.targets.kcal - r.macros.kcal;
-    const k = r.targets.kcal.toLocaleString('en-AU');
-    if (!r.hasLog) return 'Nothing logged yet. The day is about ' + k + ' kcal.';
-    if (left >= 0) return 'About ' + Math.round(left) + ' kcal left of the ' + k + ' kcal day.';
-    return 'About ' + Math.round(-left) + ' kcal over the ' + k + ' kcal day.';
-  }
-  const left = r.targets.protein - r.macros.p;
-  const pt = r.targets.protein;
-  if (!r.hasLog) return 'Nothing logged yet. Protein target is ' + pt + ' g.';
-  if (left >= 0) return 'Protein left today is about ' + Math.round(left) + ' g of the ' + pt + ' g target.';
-  return 'Protein is about ' + Math.round(-left) + ' g over the ' + pt + ' g target.';
-}
-function localFoodAnswer(text, st, date) {
-  const t = String(text || '').toLowerCase();
-  if (!t.trim()) return '';
-  const logging = /\d+\s*g\b|\b(had|ate|eaten|skip|skipped|instead|brekkie|breakfast|lunch|dinner|snack|yoghurt|yogurt)\b/.test(t);
-  if (logging) return '';
-  if (/\b(low|short|missing|gap|deficient)\b|micronutrient|what am i low|what(?:'s| is) low/.test(t)) return lowReply(st, date);
-  if (/protein/.test(t) && /(left|remain|target|how much|have i)/.test(t)) return macroReply(st, date, 'protein');
-  if (/(calor|kcal|energy)/.test(t) && /(left|remain|target|how much|have i)/.test(t)) return macroReply(st, date, 'kcal');
-  return '';
+  return out;
 }
 
 function optionById(id) { return OPTS[id] ? OPTS[id].opt : null; }
@@ -639,6 +650,15 @@ function applyOne(state, action, date) {
   if (op === 'remove' || op === 'delete') return removeFood(state, date, action);
   if (op === 'add_estimate') return addEstimate(state, date, action);
   if (op === 'select_option') return selectOption(state, date, String(action.option || action.id || ''));
+  if (op === 'add_more') {
+    const id = resolveFoodId(action.id);
+    const g = clampG(action.grams);
+    if (!id || !g) return { skip: 'Unknown food' };
+    const day = ensureDay(state, date);
+    if (day.items.length >= MAX_ITEMS) return { skip: 'Too many foods today' };
+    day.items.push(makeItem({ id, g, slot: '' }, 'snacks'));
+    return { change: foodName(id) + ' added' };
+  }
   if (op === 'unselect_option') return unselectOption(state, date, String(action.option || action.id || ''));
   if (op === 'add_meal') {
     const meal = mealIdOf(action.meal);
@@ -753,222 +773,4 @@ function setItemGrams(st, date, uid, grams) {
 }
 function removeItem(st, date, uid) {
   return applyFoodActions(st, [{ op: 'remove', uid }], date);
-}
-
-function libraryLines() {
-  return Object.keys(LIB).map(id => id + ' | ' + LIB[id].short + ' | ' + LIB[id].g + ' g').join('\n');
-}
-function foodAiContext(st, date) {
-  const state = loadFoodState(st && st.days ? st : {});
-  const report = dayReport(state, date);
-  const day = state.days[date] || blankFoodDay();
-  return {
-    date,
-    targets: TARGETS,
-    sillz: SILLZ,
-    eaten: { kcal: Math.round(report.macros.kcal), protein: Math.round(report.macros.p), carbs: Math.round(report.macros.c), fat: Math.round(report.macros.f) },
-    proteinLeft: Math.round(TARGETS.protein - report.macros.p),
-    kcalLeft: Math.round(TARGETS.kcal - report.macros.kcal),
-    picks: state.picks,
-    log: day.items.map(item => ({
-      id: item.estimate ? '' : item.id,
-      name: item.estimate ? item.name : foodName(item.id),
-      grams: item.g,
-      meal: item.meal || '',
-      estimate: !!item.estimate
-    })),
-    low: report.lows.map(n => ({ name: n.name, pct: n.pct, suggestions: n.suggestions.map(s => s.label) })),
-    hard: report.hard.filter(h => !h.hit).map(h => ({ name: h.name, pct: h.pct, note: h.note })),
-
-    selected: day.sel || {},
-    options: SLOTS.map(sl => ({ meal: sl.id, label: sl.label, options: sl.options.map(o => ({ id: o.id, name: o.name })) })),
-    snacks: SNACK_OPTS.map(o => ({ id: o.id, name: o.name })),
-    supplements: SUPP_OPTS.map(o => ({ id: o.id, name: o.name }))
-  };
-}
-function foodAiSystem(st, date) {
-  const today = foodAiContext(st, date);
-  return [
-    'You are Ask AI in Lockie\'s training app. He tells you what he ate, or asks about today. Reply in Australian English. One or two short sentences. Say yoghurt, not yogurt.',
-    'Call update_food every time. The reply is what he reads. The actions list is the only way to change the log. Use an empty actions list for questions. Never claim a change that is not in actions.',
-    'The app multiplies the food library by grams. Never invent calorie or nutrient totals. If he asks what he is low on, answer from TODAY.low and TODAY.hard only. K2 is the known hard gap: mention the note, do not nag.',
-    'Library ids (id | name | default grams):',
-    libraryLines(),
-    'Operations. food id must be a library id. grams are the amount he ate, not per 100 g:',
-    '{"op":"add","id":"<id>","grams":0,"meal":"yoghurt|egg|bowl|snacks|supps"} — sets that food to this amount. Does not stack on what is already logged.',
-    '{"op":"update","id":"<id>","grams":0,"meal":"..."}',
-    '{"op":"remove","id":"<id>","meal":"..."} — skip that food. Use this for "no mushrooms" (id uv_mushrooms, meal egg).',
-    '{"op":"select_option","option":"<option id from TODAY.options, TODAY.snacks or TODAY.supplements>"} — log a whole meal option (replaces that meal slot) or add a snack/supplement. Prefer this when he names a meal from the menu (e.g. "had the burrito bowl for dinner").',
-    '{"op":"unselect_option","option":"<id>"} — remove a selected option or snack.',
-    '{"op":"add_meal","meal":"yoghurt|egg|bowl|snacks|supps"} — log the selected (or default) option for that slot. snacks = the four daily drinks; supps = cod liver oil + D3+K2.',
-    '{"op":"add_estimate","name":"...","grams":0,"kcal":0,"protein_g":0,"carbs_g":0,"fat_g":0} — only for food that is not in the library. Values are for the amount he ate. Add a micronutrient field only when you can give a fair number. The app marks it as an estimate.',
-    'Do not add natto, pumpkin seeds, chia, sardines, almonds, cacao, or Brazil nuts. They are not in this plan. If he mentions pumpkin seeds, ignore them.',
-    'Meal slots: yoghurt = Breakfast (Meal 1), egg = Lunch (Meal 2), bowl = Dinner (Meal 3, a 7-night rotation). Snacks & drinks and supplements add on top. Use the option ids in TODAY.options.',
-    'No markdown. Do not undo; the app has Undo.',
-    'TODAY:',
-    JSON.stringify(today)
-  ].join('\n');
-}
-
-const FOOD_AI_TOOL = {
-  name: 'update_food',
-  description: 'Answer Lockie and optionally update today\'s food log. Always call this. Leave actions empty when nothing should change. Amounts are grams of a library food. The app calculates nutrients.',
-  parameters: {
-    type: 'OBJECT',
-    properties: {
-      reply: { type: 'STRING', description: 'One or two short sentences in Australian English. No markdown.' },
-      actions: {
-        type: 'ARRAY',
-        description: 'Log changes. Empty for a question.',
-        items: {
-          type: 'OBJECT',
-          properties: {
-            op: { type: 'STRING', enum: ['add', 'remove', 'update', 'add_meal', 'clear_meal', 'select_option', 'unselect_option', 'set_swap', 'set_mushrooms', 'add_estimate'] },
-            id: { type: 'STRING' },
-            option: { type: 'STRING' },
-            grams: { type: 'NUMBER' },
-            meal: { type: 'STRING', enum: ['yoghurt', 'egg', 'bowl', 'snacks', 'supps'] },
-            slot: { type: 'STRING', enum: ['protein', 'carb', 'cheese', 'fat', 'milk', 'fruit'] },
-            mushrooms: { type: 'BOOLEAN' },
-            on: { type: 'BOOLEAN' },
-            name: { type: 'STRING' },
-            kcal: { type: 'NUMBER' },
-            protein_g: { type: 'NUMBER' },
-            carbs_g: { type: 'NUMBER' },
-            fat_g: { type: 'NUMBER' },
-            fibre_g: { type: 'NUMBER' },
-            A_ug: { type: 'NUMBER' }, B1_mg: { type: 'NUMBER' }, B2_mg: { type: 'NUMBER' }, B3_mg: { type: 'NUMBER' },
-            B5_mg: { type: 'NUMBER' }, B6_mg: { type: 'NUMBER' }, folate_ug: { type: 'NUMBER' }, B12_ug: { type: 'NUMBER' },
-            C_mg: { type: 'NUMBER' }, D_ug: { type: 'NUMBER' }, E_mg: { type: 'NUMBER' }, K1_ug: { type: 'NUMBER' }, K2_ug: { type: 'NUMBER' },
-            calcium_mg: { type: 'NUMBER' }, copper_mg: { type: 'NUMBER' }, iron_mg: { type: 'NUMBER' }, magnesium_mg: { type: 'NUMBER' },
-            manganese_mg: { type: 'NUMBER' }, phosphorus_mg: { type: 'NUMBER' }, potassium_mg: { type: 'NUMBER' }, selenium_ug: { type: 'NUMBER' }, zinc_mg: { type: 'NUMBER' }
-          },
-          required: ['op']
-        }
-      }
-    },
-    required: ['reply', 'actions']
-  }
-};
-
-function geminiContents(history, userText) {
-  const turns = [];
-  const prior = Array.isArray(history) ? history.slice(-6) : [];
-  for (const m of prior) {
-    if (!m || m.local) continue;
-    if (m.role !== 'user' && m.role !== 'model') continue;
-    const role = m.role === 'model' ? 'model' : 'user';
-    const text = String(m.text || '').slice(0, 500);
-    if (!text) continue;
-    if (turns.length && turns[turns.length - 1].role === role) turns[turns.length - 1].parts[0].text += '\n' + text;
-    else turns.push({ role, parts: [{ text }] });
-  }
-  const text = String(userText || '').slice(0, 1000);
-  if (turns.length && turns[turns.length - 1].role === 'user') turns[turns.length - 1].parts[0].text += '\n' + text;
-  else turns.push({ role: 'user', parts: [{ text }] });
-  while (turns.length && turns[0].role === 'model') turns.shift();
-  return turns;
-}
-function geminiRequestBody(st, date, history, userText) {
-  return {
-    systemInstruction: { parts: [{ text: foodAiSystem(st, date) }] },
-    contents: geminiContents(history, userText),
-    tools: [{ functionDeclarations: [FOOD_AI_TOOL] }],
-    toolConfig: { functionCallingConfig: { mode: 'ANY', allowedFunctionNames: ['update_food'] } },
-    generationConfig: { temperature: 0.2, maxOutputTokens: 2048, thinkingConfig: { thinkingLevel: 'LOW' } }
-  };
-}
-function parseGeminiFood(data) {
-  if (!data || typeof data !== 'object') {
-    const err = new Error('empty'); err.code = 'empty'; throw err;
-  }
-  if (data.error) {
-    const err = new Error(data.error.message || 'api');
-    err.code = data.error.code || data.error.status || 0;
-    throw err;
-  }
-  const cand = data.candidates && data.candidates[0];
-  if (!cand) {
-    const err = new Error('empty'); err.code = 'empty'; throw err;
-  }
-  const parts = (cand.content && cand.content.parts) || [];
-  for (const p of parts) {
-    const call = p.functionCall || p.function_call;
-    if (!call) continue;
-    if (call.name !== 'update_food') continue;
-    let args = call.args || {};
-    if (typeof args === 'string') {
-      try { args = JSON.parse(args); } catch (e) { args = {}; }
-    }
-    const reply = String(args.reply || '').trim().slice(0, 600);
-    const actions = Array.isArray(args.actions) ? args.actions : [];
-    return { reply, actions };
-  }
-  const text = parts.map(p => p.text || '').join('').trim().slice(0, 600);
-  if (text) {
-    try {
-      const j = JSON.parse(text);
-      if (j && typeof j.reply === 'string') return { reply: j.reply.trim().slice(0, 600), actions: Array.isArray(j.actions) ? j.actions : [] };
-    } catch (e) { /* plain text */ }
-    return { reply: text, actions: [] };
-  }
-  const err = new Error('empty'); err.code = 'empty'; throw err;
-}
-function geminiErrorText(status, online) {
-  if (online === false) return 'Ask AI needs internet.';
-  if (status === 429) return 'Gemini is rate-limiting requests. Wait a minute and try again.';
-  if (status === 401 || status === 403) return 'That API key was rejected. Check it, or remove it and paste a new one.';
-  if (status === 400) return 'Gemini could not read that request. Try again in a moment.';
-  if (status === 0) return 'Ask AI needs internet.';
-  return 'Ask AI could not reply just then. Try again.';
-}
-
-/* Deterministic stand-in for Gemini. Used by tests and ?ai=mock. */
-function mockGeminiFood(text) {
-  const t = String(text || '').toLowerCase();
-  const actions = [];
-  const bits = [];
-  if (/\b(brekkie|breakfast)\b/.test(t) || /\byoghurt\b/.test(t) || /\byogurt\b/.test(t)) {
-    actions.push({ op: 'add_meal', meal: 'yoghurt' });
-    bits.push('Yoghurt bowl logged');
-  }
-  if (/\b(lunch|egg meal)\b/.test(t) || /\beggs?\b/.test(t)) {
-    actions.push({ op: 'add_meal', meal: 'egg', mushrooms: false });
-    bits.push('Egg meal logged');
-  }
-  if (/burrito/.test(t)) {
-    actions.push({ op: 'select_option', option: 'd3' });
-    bits.push('Burrito bowl logged');
-  } else if (/\b(dinner)\b/.test(t) || /protein bowl/.test(t)) {
-    actions.push({ op: 'add_meal', meal: 'bowl' });
-    bits.push('Dinner logged');
-  }
-  if (/\bsnacks?\b/.test(t)) {
-    actions.push({ op: 'add_meal', meal: 'snacks' });
-    bits.push('Snacks logged');
-  }
-  if (/mushroom/.test(t) && /\b(no|skip|skipped|without|didn't|didnt|not)\b/.test(t)) {
-    actions.push({ op: 'set_mushrooms', on: false });
-    actions.push({ op: 'remove', id: 'uv_mushrooms', meal: 'egg' });
-    bits.push('No mushrooms');
-  } else if (/mushroom/.test(t) && /\b(with|add|had|include)\b/.test(t)) {
-    actions.push({ op: 'set_mushrooms', on: true });
-    bits.push('Mushrooms included');
-  }
-  if (/mango/.test(t) && /kiwi|instead|swap/.test(t)) {
-    actions.push({ op: 'set_swap', slot: 'fruit', id: 'mango' });
-    bits.push('Seasonal fruit is mango');
-  }
-  if (/sweet potato/.test(t)) {
-    actions.push({ op: 'set_swap', slot: 'carb', id: 'sweet_potato' });
-    bits.push('Carb is sweet potato');
-  }
-  const whey = t.match(/(\d+)\s*g\s*whey/);
-  if (whey) actions.push({ op: 'update', id: 'whey', grams: Number(whey[1]), meal: 'yoghurt' });
-  let reply = bits.join('. ');
-  if (/pumpkin/.test(t)) reply = (reply ? reply + '. ' : '') + 'No pumpkin seeds in this plan.';
-  if (/blackberr/.test(t)) reply = (reply ? reply + '. ' : '') + 'Blackberries stay in the berry mix.';
-  if (!reply && !actions.length) reply = 'Tell me which meal you ate, or ask what you are low on.';
-  else if (!reply) reply = 'Updated today.';
-  return { reply, actions };
 }
