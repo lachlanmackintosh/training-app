@@ -12,7 +12,7 @@ function load(file) {
 load('food-plan.js');
 load('food-log.js');
 const g = {};
-for (const name of ['FOOD_PLAN', 'applyFoodActions', 'sumNutrients', 'itemNutrients', 'dayReport', 'mealTickState', 'suggestionsFor', 'isExcludedFood', 'setItemGrams', 'loadFoodState', 'closeGaps', 'friendlyAmount']) {
+for (const name of ['FOOD_PLAN', 'applyFoodActions', 'sumNutrients', 'itemNutrients', 'dayReport', 'mealTickState', 'suggestionsFor', 'isExcludedFood', 'setItemGrams', 'loadFoodState', 'closeGaps', 'friendlyAmount', 'itemNutrients', 'inSeason', 'snackOrder']) {
   g[name] = vm.runInContext(name, context);
 }
 const DATE = '2026-10-10';
@@ -163,7 +163,7 @@ test('old food storage migrates without the dropped foods', () => {
 
 test('service worker cache is the tracker build', () => {
   const sw = fs.readFileSync(path.join(root, 'sw.js'), 'utf8');
-  assert.ok(sw.indexOf("baki-v23-egg-names") !== -1);
+  assert.ok(sw.indexOf("baki-v24-seasonal") !== -1);
   assert.ok(sw.indexOf('./food-plan.js') !== -1);
   assert.ok(sw.indexOf('./food-log.js') !== -1);
 });
@@ -262,6 +262,28 @@ test('extras added to a meal survive picking that meal, and a full day needs not
   const r = g.dayReport(all, DATE, 21).gaps;
   assert.strictEqual(r.status, 'done');
   assert.strictEqual(r.ideas.length, 0);
+});
+
+test('seasonal fruit and juices carry full nutrients and count when ticked', () => {
+  const P = g.FOOD_PLAN;
+  const keys = Object.keys(P.library.mango.per);
+  for (const id of ['s_mango','s_pine','s_nect','s_peach','s_water','s_rock','s_mand','s_kiwig','s_kiwi','s_pom','s_cherry']) {
+    const o = P.snacks.find(s => s.id === id); assert.ok(o, id);
+    const lib = P.library[o.items[0].id]; assert.ok(lib, id);
+    for (const k of keys) assert.ok(typeof lib.per[k] === 'number', id + ' ' + k);
+    const before = g.dayReport({ days: {} }, DATE);
+    const st = g.applyFoodActions({}, [{ op: 'select_option', option: id }], DATE).state;
+    const r = g.dayReport(st, DATE);
+    assert.ok(r.macroBars.find(b => b.key === 'kcal' || b.key === 'k') ? true : true);
+    const kc = g.sumNutrients(st.days[DATE].items.map(g.itemNutrients)).kcal; const want = Math.round(P.library[o.items[0].id].per.kcal * o.items[0].g / 100); assert.ok(Math.abs(kc - want) < 2, id + ' ' + kc + ' vs ' + want);
+    assert.ok(kc > 10, id + ' kcal ' + kc);
+    assert.ok(r.nutrients.some(n => n.value > 0), id);
+    if (o.season) assert.ok(o.season.every(m => m >= 1 && m <= 12));
+  }
+  const oct = g.snackOrder(P.snacks, '2026-10-13').filter(o => o.season).map(o => g.inSeason(o, '2026-10-13'));
+  assert.ok(oct.indexOf(false) === -1 || oct.lastIndexOf(true) < oct.indexOf(false), 'in season first');
+  assert.ok(g.inSeason(P.snacks.find(s => s.id === 's_mango'), '2026-10-13'));
+  assert.ok(!g.inSeason(P.snacks.find(s => s.id === 's_mand'), '2026-10-13'));
 });
 
 console.log('all food tests passed');

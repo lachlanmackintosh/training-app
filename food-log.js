@@ -17,6 +17,18 @@ for (const sl of SLOTS) for (const o of sl.options) OPTS[o.id] = { opt: o, meal:
 for (const o of SNACK_OPTS) OPTS[o.id] = { opt: o, meal: 'snacks' };
 for (const o of SUPP_OPTS) OPTS[o.id] = { opt: o, meal: 'supps' };
 
+const SEASON = {}; // libId -> months (1-12), from seasonal snack options
+for (const o of SNACK_OPTS) if (Array.isArray(o.season)) SEASON[o.items[0].id] = o.season;
+function monthOf(date) { const m = /^\d{4}-(\d{2})-\d{2}$/.exec(String(date || '')); return m ? Number(m[1]) : new Date().getMonth() + 1; }
+function inSeason(o, date) { return !Array.isArray(o && o.season) || o.season.indexOf(monthOf(date)) !== -1; }
+function snackOrder(list, date) { // in-season seasonal fruit first, out-of-season last; others keep place
+  const fixed = list.filter(o => !Array.isArray(o.season)), fr = list.filter(o => Array.isArray(o.season));
+  const ins = fr.filter(o => inSeason(o, date)), outs = fr.filter(o => !inSeason(o, date));
+  const at = list.findIndex(o => Array.isArray(o.season));
+  if (at < 0) return list.slice();
+  const before = list.slice(0, at).filter(o => !Array.isArray(o.season)), after = fixed.filter(o => before.indexOf(o) === -1);
+  return before.concat(ins, outs, after);
+}
 const PREFERRED = {};
 for (const id of FOOD_PLAN.preferred) PREFERRED[id] = 1;
 const MACRO_KEYS = ['kcal', 'protein_g', 'carbs_g', 'fat_g', 'fibre_g'];
@@ -489,6 +501,11 @@ const PANTRY_META = {
   milk_cow: { kind: 'snack', group: 'dairy', max: 650 }, orange_juice: { kind: 'snack', group: 'juice', max: 260 },
   coconut_water: { kind: 'snack', group: 'drink', max: 500 }, bone_broth: { kind: 'snack', group: 'broth', fits: ['wake'], max: 250 },
   kiwi_gold: { kind: 'snack', group: 'fruit', fits: ['yoghurt'], max: 300 }, mango: { kind: 'snack', group: 'fruit', fits: ['yoghurt'], max: 250 },
+  nectarine: { kind: 'snack', group: 'fruit', fits: ['yoghurt'], max: 300 }, peach: { kind: 'snack', group: 'fruit', fits: ['yoghurt'], max: 300 },
+  watermelon: { kind: 'snack', group: 'fruit', max: 500 }, rockmelon: { kind: 'snack', group: 'fruit', max: 400 },
+  pineapple: { kind: 'snack', group: 'fruit', fits: ['yoghurt'], max: 300 }, mandarin: { kind: 'snack', group: 'fruit', max: 300 },
+  kiwi_green: { kind: 'snack', group: 'fruit', fits: ['yoghurt'], max: 300 },
+  pom_juice: { kind: 'snack', group: 'juice', max: 260 }, tart_cherry_conc: { kind: 'snack', group: 'tart', max: 40 },
   greek_yoghurt: { kind: 'snack', group: 'dairy', fits: ['yoghurt'], max: 500 }, whey: { kind: 'snack', group: 'whey', fits: ['yoghurt'], max: 90 },
   blueberries: { kind: 'snack', group: 'berries', fits: ['yoghurt'], max: 200 }, raspberries: { kind: 'snack', group: 'berries', fits: ['yoghurt'], max: 200 },
   blackberries: { kind: 'snack', group: 'berries', fits: ['yoghurt'], max: 200 }, strawberries: { kind: 'snack', group: 'berries', fits: ['yoghurt'], max: 200 },
@@ -559,6 +576,7 @@ function closeGaps(report, date, hour) {
   const units = [];
   for (const p of (FOOD_PLAN.pantry || [])) {
     if (!LIB[p.id]) continue;
+    if (SEASON[p.id] && SEASON[p.id].indexOf(monthOf(date)) === -1) continue; // out-of-season fruit
     const meta = PANTRY_META[p.id] || { kind: 'snack', group: p.id };
     if ((p.daily || meta.kind === 'supp') && had[p.id]) continue;
     let meal = '';

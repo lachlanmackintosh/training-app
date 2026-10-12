@@ -554,3 +554,5 @@ body.sheet-on{overflow:hidden}
 .rlist li{padding:11px 14px;border-top:1px solid var(--line);font-size:var(--fs-s);line-height:1.5;color:#c9d4da}
 .rlist li:first-child{border-top:0}
 .rlist li b{color:var(--text);font-weight:650}
+
+.seas{font-weight:400;font-size:.78em;opacity:.55}.seas.in{opacity:.9;color:#3a9a6a}
