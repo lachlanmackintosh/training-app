@@ -163,7 +163,7 @@ test('old food storage migrates without the dropped foods', () => {
 
 test('service worker cache is the tracker build', () => {
   const sw = fs.readFileSync(path.join(root, 'sw.js'), 'utf8');
-  assert.ok(sw.indexOf("baki-v22-supp-cards") !== -1);
+  assert.ok(sw.indexOf("baki-v23-egg-names") !== -1);
   assert.ok(sw.indexOf('./food-plan.js') !== -1);
   assert.ok(sw.indexOf('./food-log.js') !== -1);
 });
@@ -218,7 +218,7 @@ test('gap ideas are time-aware, diverse, explained and within upper limits', () 
   // Meal 1 without its whey: protein is short, Meal 2 is next
   const base = g.applyFoodActions({}, [{ op: 'add_meal', meal: 'wake' }, { op: 'add_meal', meal: 'yoghurt' }, { op: 'remove', id: 'whey', meal: 'yoghurt' }], DATE).state;
   const mid = g.dayReport(base, DATE, 11).gaps;
-  assert.ok(/Egg meal/.test(mid.assumed) && mid.assumedSupps);
+  assert.ok(/Egg & sourdough/.test(mid.assumed) && mid.assumedSupps);
   assert.strictEqual(mid.next, 'egg');
   assert.ok(mid.ideas.length >= 1 && mid.ideas.length <= 3);
   const seen = {};
