@@ -172,7 +172,7 @@ test('suggester uses pantry foods only, ignores K2, assumes tonight\'s dinner', 
   const P = g.FOOD_PLAN;
   const pantry = {};
   for (const p of P.pantry) pantry[p.id] = 1;
-  let st = g.applyFoodActions({}, [{ op: 'add_meal', meal: 'yoghurt' }, { op: 'add_meal', meal: 'egg' }], DATE).state;
+  let st = g.applyFoodActions({}, [{ op: 'add_meal', meal: 'yoghurt' }, { op: 'add_meal', meal: 'egg' }, { op: 'remove', id: 'whey', meal: 'yoghurt' }], DATE).state;
   let r = g.dayReport(st, DATE);
   assert.ok(/Beef burger/.test(r.gaps.assumed)); // Sat = night 6
   assert.ok(!r.gaps.gaps.some(x => x.key === 'K2_ug'));
