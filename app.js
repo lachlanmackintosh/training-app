@@ -665,7 +665,7 @@ function slotCard(day, sl) {
   const tonight = sl.id === 'bowl' ? defaultOption('bowl', todayStr()) : '';
   const opts = sl.options.map(o => optRow(o, o.id === sel, false)).join('');
   const sub = sel ? optionById(sel).name : (tonight ? 'Tonight: ' + optionById(tonight).name : 'Pick one');
-  const extras = day.items.filter(i => i.meal === sl.id && i.extra).map(i => friendlyAmount(i.id, i.g) + ' ' + foodName(i.id).toLowerCase());
+  const extras = day.items.filter(i => i.meal === sl.id && i.extra).map(i => measureOf(i.id) ? measureLabel(i.id, i.g) : friendlyAmount(i.id, i.g) + ' ' + foodName(i.id).toLowerCase());
   return `<section class="card slot${sel ? ' picked' : ''}"><div class="slot-h"><div><h3>${esc(sl.label)}</h3><div class="muted tiny">${esc(sl.short)}</div></div><span class="slot-s${sel ? ' on' : ''}">${sel ? '✓ ' : ''}${esc(sub)}</span></div>${extras.length ? `<div class="muted tiny" style="margin-top:6px">Added: ${esc(extras.join(', '))}</div>` : ''}${opts}</section>`;
 }
 function multiCard(day, title, list, sub) {
@@ -683,18 +683,20 @@ function logCard(day) {
   const rows = day.items.map(item => {
     const name = item.estimate ? item.name : foodName(item.id);
     const badge = item.estimate ? '<span class="estimate">Estimate</span>' : '';
-    const casual = !item.estimate && CASUAL[item.id] ? ' · ' + friendlyAmount(item.id, item.g) : '';
+    const casual = !item.estimate && (CASUAL[item.id] || measureOf(item.id)) ? ' · ' + friendlyAmount(item.id, item.g) : '';
     const sub = `<div class="muted small">${esc(label(item) + casual)}</div>`;
     if (item.flat) {
       const kcal = item.tot && item.tot.kcal ? Math.round(item.tot.kcal) : 0;
       return `<div class="irow"><div class="irow-name"><b>${esc(name)}${badge}</b><div class="muted small">About ${comma(kcal)} kcal</div></div><button type="button" class="linkbtn" data-act="log-del" data-uid="${esc(item.uid)}">Remove</button></div>`;
     }
-    const u = item.estimate ? 'g' : unitOf(item.id);
+    const ms = !item.estimate && measureOf(item.id);
+    const u = ms ? ms.many : item.estimate ? 'g' : unitOf(item.id);
+    const val = ms ? Math.round(item.g / ms.per * 100) / 100 : item.g;
     return `<div class="irow"><div class="irow-name"><b>${esc(name)}${badge}</b>${sub}</div>
-      <label class="gramlab"><input class="gram" type="number" inputmode="decimal" min="0.1" max="2500" step="any" data-grams="${esc(item.uid)}" value="${item.g}" aria-label="${esc(name)} amount"><span>${esc(u)}</span></label>
+      <label class="gramlab"><input class="gram" type="number" inputmode="decimal" min="0.1" max="2500" step="${ms ? '0.25' : 'any'}" data-grams="${esc(item.uid)}"${ms ? ` data-per="${ms.per}"` : ''} value="${val}" aria-label="${esc(name)} amount"><span>${esc(u)}</span></label>
       <button type="button" class="linkbtn" data-act="log-del" data-uid="${esc(item.uid)}">Remove</button></div>`;
   }).join('');
-  return `<details class="card fold" data-keep="log"><summary>Today's log (${day.items.length} foods)</summary><div class="muted small">Everything selected today. Edit amounts in grams here.</div>${rows}</details>`;
+  return `<details class="card fold" data-keep="log"><summary>Today's log (${day.items.length} foods)</summary><div class="muted small">Everything selected today. Edit amounts here: fruit, veg and sourdough in units, everything else in grams.</div>${rows}</details>`;
 }
 function renderMeals(st) {
   const day = normaliseFoodDay(st.days && st.days[todayStr()], st.picks);
@@ -918,7 +920,7 @@ document.addEventListener('change', e => {
     refreshFoodViews();
   }
   if (e.target.dataset && e.target.dataset.grams) {
-    const g = Math.round(Number(e.target.value) * 10) / 10;
+    const g = Math.round(Number(e.target.value) * (Number(e.target.dataset.per) || 1) * 10) / 10;
     if (!g || g <= 0 || g > 2500) { refreshFoodViews(); return; }
     const res = setItemGrams(foodState(), todayStr(), e.target.dataset.grams, g);
     if (res.changed) { saveFood(res.state); refreshFoodViews(); }

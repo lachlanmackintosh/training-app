@@ -163,7 +163,7 @@ test('old food storage migrates without the dropped foods', () => {
 
 test('service worker cache is the tracker build', () => {
   const sw = fs.readFileSync(path.join(root, 'sw.js'), 'utf8');
-  assert.ok(sw.indexOf("baki-v25-weekly") !== -1);
+  assert.ok(sw.indexOf("baki-v26-units") !== -1);
   assert.ok(sw.indexOf('./food-plan.js') !== -1);
   assert.ok(sw.indexOf('./food-log.js') !== -1);
 });
@@ -207,6 +207,20 @@ test('friendly measures for herbs, spices, salad and fats; grams for protein and
   assert.strictEqual(fa('beef_liver', 20), '20 g');
   assert.strictEqual(fa('rice', 150), '150 g');
   assert.strictEqual(fa('greek_yoghurt', 300), '300 g');
+  // fruit, veg and sourdough show in whole units, grams stay underneath
+  assert.strictEqual(fa('sourdough', 100), '2 slices');
+  assert.strictEqual(fa('sourdough', 50), '1 slice');
+  assert.strictEqual(fa('banana', 120), '1 banana');
+  assert.strictEqual(fa('tomato', 60), '½ tomato');
+  assert.strictEqual(fa('capsicum', 120), '1 capsicum');
+  assert.strictEqual(fa('red_onion', 27.5), '¼ red onion');
+  assert.strictEqual(fa('avocado', 70), '½ avocado');
+  assert.strictEqual(fa('mango', 200), '1 mango');
+  assert.strictEqual(fa('potato', 250), '250 g');
+  for (const sl of g.FOOD_PLAN.slots) for (const o of sl.options) for (const it of o.items.concat(o.partner || [])) {
+    const m = g.FOOD_PLAN.library[it.id].measure;
+    if (m) assert.ok(!/ g$/.test(fa(it.id, it.g)), it.id + ' ' + it.g);
+  }
   // nutrition still uses the exact grams
   const st = g.applyFoodActions({}, [{ op: 'select_option', option: 'b_berry' }], DATE).state;
   const c = st.days[DATE].items.find(i => i.id === 'cinnamon');

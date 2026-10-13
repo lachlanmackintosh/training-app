@@ -393,10 +393,6 @@ const CASUAL = {
   spring_onion: g => countOf(g, 15, 'spring onion', 'spring onions'),
   cos: g => g <= 35 ? 'handful' : g <= 70 ? '2 handfuls' : '3 handfuls',
   rocket: g => g <= 25 ? 'handful' : '2 handfuls',
-  red_onion: g => g <= 20 ? '2 tbsp diced' : countOf(g, 150, 'onion', 'onions'),
-  cucumber: g => countOf(g, 130, 'cucumber', 'cucumbers'),
-  tomato: g => countOf(g, 120, 'tomato', 'tomatoes'),
-  capsicum: g => countOf(g, 160, 'capsicum', 'capsicums'),
   evoo: g => g >= 15 ? countOf(g, 18, 'tbsp', 'tbsp') : countOf(g, 5, 'tsp', 'tsp'),
   butter: g => g >= 15 ? countOf(g, 18, 'tbsp', 'tbsp') : countOf(g, 5, 'tsp', 'tsp'),
   ghee: g => g >= 15 ? countOf(g, 18, 'tbsp', 'tbsp') : countOf(g, 5, 'tsp', 'tsp'),
@@ -405,7 +401,25 @@ const CASUAL = {
   maple: g => countOf(g, 6.5, 'tsp', 'tsp') + ' · ' + formatAmount(g) + ' g',
   dark_choc: g => countOf(g, 7.5, 'square', 'squares') + ' · ' + formatAmount(g) + ' g'
 };
+/* Fruit, veg and sourdough show as whole units (1 banana, ½ tomato, 2 slices); grams stay underneath for nutrition. */
+function measureOf(id) { return LIB[id] && LIB[id].measure; }
+function unitCount(id, g) { const m = measureOf(id); return m ? Number(g) / m.per : 0; }
+function unitText(id, g) {
+  const m = measureOf(id), x = Number(g) / m.per;
+  let f = nearFrac(x);
+  if (x > 4.25 || Math.abs(f[0] - x) > 0.08) {
+    const r = Math.max(0.25, Math.round(x * 4) / 4), w = Math.floor(r), q = ['', '¼', '½', '¾'][Math.round((r - w) * 4)];
+    f = [r, (w ? String(w) : '') + q];
+  }
+  const many = f[0] > 1;
+  return f[1] + ' ' + (many ? m.many : m.one);
+}
+function measureLabel(id, g) {
+  const m = measureOf(id), short = LIB[id].short.toLowerCase(), w1 = m.one.split(' ').pop().toLowerCase(), w2 = m.many.split(' ').pop().toLowerCase();
+  return unitText(id, g) + (short.indexOf(w1) === -1 && short.indexOf(w2) === -1 ? ' ' + short : '');
+}
 function friendlyAmount(id, g) {
+  if (measureOf(id) && g > 0) return unitText(id, g);
   const fn = CASUAL[id];
   if (fn && g > 0) return fn(Number(g));
   const unit = (LIB[id] && LIB[id].unit) || 'g';
@@ -431,7 +445,7 @@ function suggestionsFor(key, eaten) {
     if (isExcludedFood(id, LIB[id].name)) continue;
     const amt = servingAmount(id, key);
     if (!(amt > 0)) continue;
-    rows.push({ id, amt, preferred: !!PREFERRED[id], label: LIB[id].short + ', ' + LIB[id].g + ' g' });
+    rows.push({ id, amt, preferred: !!PREFERRED[id], label: LIB[id].short + ', ' + friendlyAmount(id, LIB[id].g) });
   }
   function take(minFrac) {
     const min = target * minFrac;
@@ -591,7 +605,7 @@ function closeGaps(report, date, hour) {
       if (meta.max && (had[p.id] || 0) + g > meta.max) break;
       const nut = itemNutrients({ id: p.id, g });
       if (evening && meta.kind !== 'supp' && nut.kcal > 250) break;
-      const base1 = (p.labels && p.labels[n - 1]) || (g + ' ' + (LIB[p.id].unit || 'g') + ' ' + LIB[p.id].short.toLowerCase());
+      const base1 = measureOf(p.id) ? measureLabel(p.id, g) : (p.labels && p.labels[n - 1]) || (g + ' ' + (LIB[p.id].unit || 'g') + ' ' + LIB[p.id].short.toLowerCase());
       units.push({ id: p.id, g, n, meal, group: meta.group || p.id, again: !!had[p.id], label: (had[p.id] ? (/^\d/.test(base1) ? '+' : /^a /.test(base1) ? 'another ' : 'extra ') + base1.replace(/^a /, '') : base1), nut });
     }
   }
@@ -722,11 +736,11 @@ function upsertFood(state, date, spec) {
     if (meal) item.meal = meal;
     if (slot) item.slot = slot;
     item.edited = true;
-    return { change: foodName(id) + ' set to ' + g + ' g' };
+    return { change: foodName(id) + ' set to ' + friendlyAmount(id, g) };
   }
   if (day.items.length >= MAX_ITEMS) return { skip: 'Too many foods today' };
   day.items.push(makeItem({ id, g, slot }, meal));
-  return { change: foodName(id) + ' ' + g + ' g added' };
+  return { change: foodName(id) + ' ' + friendlyAmount(id, g) + ' added' };
 }
 function removeFood(state, date, spec) {
   const day = ensureDay(state, date);
