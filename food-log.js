@@ -909,3 +909,53 @@ function setItemGrams(st, date, uid, grams) {
 function removeItem(st, date, uid) {
   return applyFoodActions(st, [{ op: 'remove', uid }], date);
 }
+
+/* ---------- calendar days + weekly stats (Australia/Brisbane, UTC+10, no DST) ---------- */
+function brisbaneYmd(ms) {
+  const d = new Date((ms == null ? Date.now() : Number(ms)) + 10 * 3600 * 1000);
+  return d.getUTCFullYear() + '-' + String(d.getUTCMonth() + 1).padStart(2, '0') + '-' + String(d.getUTCDate()).padStart(2, '0');
+}
+function addDaysYmd(ymdStr, n) {
+  const [y, m, d] = String(ymdStr).split('-').map(Number);
+  const t = new Date(Date.UTC(y, m - 1, d + n));
+  return t.getUTCFullYear() + '-' + String(t.getUTCMonth() + 1).padStart(2, '0') + '-' + String(t.getUTCDate()).padStart(2, '0');
+}
+function weekStartYmd(ymdStr) { // Monday of that week
+  const [y, m, d] = String(ymdStr).split('-').map(Number);
+  const dow = new Date(Date.UTC(y, m - 1, d)).getUTCDay(); // 0 Sun
+  return addDaysYmd(ymdStr, -((dow + 6) % 7));
+}
+function weekReport(st, anyDate, todayDate) {
+  const start = weekStartYmd(anyDate);
+  const state = loadFoodState(st && st.days ? { picks: st.picks, checks: st.checks, days: st.days, v: st.v } : (st || {}));
+  const today = todayDate || brisbaneYmd();
+  const dates = [], strip = [];
+  const tot = {};
+  let logged = 0;
+  for (let i = 0; i < 7; i++) {
+    const ds = addDaysYmd(start, i); dates.push(ds);
+    const day = state.days[ds] || blankFoodDay();
+    const sum = sumNutrients(day.items.map(itemNutrients));
+    const has = day.items.length > 0;
+    if (has) logged++;
+    for (const k of Object.keys(sum)) tot[k] = (tot[k] || 0) + (Number(sum[k]) || 0);
+    let microHit = 0;
+    for (const n of NUTS) if (nutrientPct(sum[n.key] || 0, SILLZ[n.key]) >= 100) microHit++;
+    strip.push({ date: ds, has, future: ds > today, today: ds === today, kcal: sum.kcal || 0, protein: sum.protein_g || 0, microHit, microTotal: NUTS.length });
+  }
+  const row = (key, name, unit, daily, upper) => {
+    const value = tot[key] || 0, target = (Number(daily) || 0) * 7;
+    const pct = target ? Math.round(value / target * 100) : 0;
+    const over = upper ? value > upper * 7 : false;
+    return { key, name, unit, value, target, avg: value / 7, avgLogged: logged ? value / logged : 0, dailyTarget: Number(daily) || 0, pct, hit: pct >= 100, short: pct < 100, over };
+  };
+  const macros = [
+    row('kcal', 'Calories', '', TARGETS.kcal),
+    row('protein_g', 'Protein', 'g', TARGETS.protein),
+    row('carbs_g', 'Carbs', 'g', TARGETS.carbs),
+    row('fat_g', 'Fat', 'g', TARGETS.fat),
+    row('fibre_g', 'Fibre', 'g', TARGETS.fibre || 30)
+  ];
+  const micros = NUTS.map(n => row(n.key, n.name, n.unit, SILLZ[n.key], UPPER[n.key]));
+  return { start, end: dates[6], dates, strip, logged, macros, micros, totals: tot };
+}

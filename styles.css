@@ -556,3 +556,23 @@ body.sheet-on{overflow:hidden}
 .rlist li b{color:var(--text);font-weight:650}
 
 .seas{font-weight:400;font-size:.78em;opacity:.55}.seas.in{opacity:.9;color:#3a9a6a}
+
+/* weekly tracker */
+.week .wnav{margin:10px 0 8px;gap:8px}
+.week .btn.sm{padding:6px 10px;font-size:13px;width:auto;margin:0}
+.week .btn.sm[disabled]{opacity:.35}
+.wstrip{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;margin:4px 0 6px}
+.wday{border:1px solid var(--line,rgba(127,127,127,.25));border-radius:10px;padding:6px 2px;text-align:center;font-size:11px;line-height:1.35}
+.wday.now{border-color:var(--accent,currentColor)}
+.wday.empty{opacity:.5}
+.wday .wd{font-weight:600;font-size:12px}
+.wday .wm{opacity:.7}
+.wh{margin:16px 0 6px;font-size:15px}
+.wrow{display:grid;grid-template-columns:1fr auto;gap:2px 8px;padding:7px 0;border-top:1px solid var(--line,rgba(127,127,127,.15));font-size:13px}
+.wrow .wname{font-weight:500}.wrow .wpct{text-align:right;font-weight:600}
+.wrow .wval{text-align:right}
+.wrow .wbar{grid-column:1/-1;height:4px;border-radius:2px;background:rgba(127,127,127,.15);overflow:hidden}
+.wrow .wbar i{display:block;height:100%;background:var(--accent,#888)}
+.wrow.short .wpct{color:var(--warn)}.wrow.short .wbar i{background:var(--warn)}
+.wrow.over .wpct,.wrow.over .wflag{color:var(--rec)}.wrow.over .wbar i{background:var(--rec)}
+.wflag{font-size:11px;font-weight:600}
