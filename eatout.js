@@ -1,6 +1,7 @@
 /* Eaten out: AI estimate of a restaurant meal (OpenAI, called straight from the browser with the user's own key).
    Pure helpers + one network call with an injectable fetch, so tests can mock it. Key lives only in localStorage. */
-const EATOUT_MODEL = 'gpt-4o-mini';
+const EATOUT_MODEL = 'gpt-4.1-mini';
+const EATOUT_MODELS_URL = 'https://api.openai.com/v1/models';
 const EATOUT_URL = 'https://api.openai.com/v1/chat/completions';
 const EATOUT_MULTS = [0.5, 0.75, 1, 1.25, 1.5, 2];
 function eatoutKeys() { return ['kcal', 'protein_g', 'carbs_g', 'fat_g', 'fibre_g'].concat(FOOD_PLAN.nutrients.map(n => n.key)); }
@@ -91,21 +92,56 @@ function addEatoutEntry(state, date, est, label) {
 function eatoutErrorMessage(status, body) {
   const msg = body && body.error && body.error.message ? String(body.error.message) : '';
   const code = body && body.error && (body.error.code || body.error.type) ? String(body.error.code || body.error.type) : '';
-  if (status === 401) return 'That API key was rejected. Check it in Food → Eaten out → Settings.';
-  if (status === 429 && /quota|billing/i.test(code + msg)) return 'Your OpenAI account has no credit. Add a few dollars at platform.openai.com → Billing.';
-  if (status === 429) return 'OpenAI is rate-limiting. Wait a few seconds and try again.';
-  if (status === 404 || code === 'model_not_found') return 'That model isn\'t available on your key.';
-  if (status >= 500) return 'OpenAI is having trouble right now. Try again shortly.';
+  const det = msg ? ' (' + status + ': ' + cleanEatoutText(msg, 140).replace(/sk-[A-Za-z0-9_*-]+/g, 'sk-…') + ')' : ' (' + status + ')';
+  if (status === 403) return 'OpenAI refused the request for this key/project. Check the key\'s permissions at platform.openai.com.' + det;
+  if (status === 401) return 'OpenAI rejected that API key. Re-copy it from platform.openai.com → API keys and paste it in Settings.' + det;
+  if (status === 429 && /quota|billing/i.test(code + msg)) return 'Your OpenAI account has no credit. Add a few dollars at platform.openai.com → Billing.' + det;
+  if (status === 429) return 'OpenAI is rate-limiting. Wait a few seconds and try again.' + det;
+  if (status === 404 || code === 'model_not_found') return 'That model isn\'t available on your key. Clear the Model box in Settings to use ' + EATOUT_MODEL + '.' + det;
+  if (status >= 500) return 'OpenAI is having trouble right now. Try again shortly.' + det;
   return 'AI request failed (' + status + ')' + (msg ? ': ' + msg.slice(0, 140) : '');
+}
+/* Keys pasted on a phone often carry spaces, newlines, zero-width or smart characters. Header values must be plain ASCII. */
+function cleanEatoutKey(k) {
+  return String(k == null ? '' : k).replace(/^\s*(?:bearer\s+)?/i, '').replace(/[\s\u200b-\u200d\u2060\ufeff\u00a0]+/g, '').replace(/^["'\u2018\u2019\u201c\u201d]+|["'\u2018\u2019\u201c\u201d]+$/g, '');
+}
+function eatoutKeyProblem(k) {
+  if (!k) return 'Add your OpenAI API key first (Settings in the Eaten out sheet).';
+  if (/[^\x21-\x7e]/.test(k)) return 'Your API key has a strange character in it (often from copy/paste). Re-copy it from OpenAI and paste it again in Settings.';
+  if (!/^sk-/.test(k)) return 'That doesn\'t look like an OpenAI API key (it should start with sk-). Check it in Settings.';
+  if (k.length < 20) return 'That API key looks cut short. Re-copy the whole key from OpenAI.';
+  return '';
+}
+function cleanEatoutModel(m) {
+  const s = String(m == null ? '' : m).trim().toLowerCase().replace(/[\u2010-\u2015]/g, '-').replace(/\s+/g, '-');
+  return /^[a-z0-9][a-z0-9._:-]{1,63}$/.test(s) ? s : EATOUT_MODEL;
+}
+/* OpenAI's chat endpoint answers some errors (e.g. a wrong key) WITHOUT CORS headers, so the browser reports them as a
+   network failure. /v1/models does send CORS headers, so after a failure we ask it what's actually wrong. */
+async function eatoutDiagnose(key, model, f) {
+  let res, data = null;
+  try { res = await f(EATOUT_MODELS_URL + '/' + encodeURIComponent(model || EATOUT_MODEL), { method: 'GET', headers: { Authorization: 'Bearer ' + key } }); }
+  catch (e) { return ''; }
+  try { data = await res.json(); } catch (e) { data = null; }
+  if (res.ok) return '';
+  return eatoutErrorMessage(res.status, data);
 }
 async function eatoutCall(body, key, fetchFn) {
   const f = fetchFn || (typeof fetch === 'function' ? fetch : null);
-  if (!key) throw new Error('Add your OpenAI API key first (Settings in the Eaten out sheet).');
+  key = cleanEatoutKey(key);
+  const bad = eatoutKeyProblem(key);
+  if (bad) throw new Error(bad);
+  if (body && body.model) body.model = cleanEatoutModel(body.model);
   if (typeof navigator !== 'undefined' && navigator && navigator.onLine === false) throw new Error('You\'re offline. Connect to the internet to estimate a meal.');
   let res;
   try {
     res = await f(EATOUT_URL, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + key }, body: JSON.stringify(body) });
-  } catch (e) { throw new Error('Couldn\'t reach OpenAI. Check your internet and try again.'); }
+  } catch (e) {
+    const why = await eatoutDiagnose(key, body && body.model, f);
+    if (why) throw new Error(why);
+    const detail = cleanEatoutText((e && (e.name ? e.name + ': ' : '') + (e.message || '')) || String(e), 120);
+    throw new Error('Couldn\'t reach OpenAI (' + (detail || 'network error') + '). Your key and model look fine, so try again in a moment.');
+  }
   let data = null;
   try { data = await res.json(); } catch (e) { data = null; }
   if (!res.ok) throw new Error(eatoutErrorMessage(res.status, data));

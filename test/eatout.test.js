@@ -26,11 +26,11 @@ test('schema covers every tracked nutrient, strict', () => {
 });
 test('request: model, json_schema, bearer key, Australian portions, person', async () => {
   const seen = {};
-  const est = await g('estimateEatout')('parmy and chips', 'TESTPERSON', 'sk-test', mockFetch(200, { choices: [{ message: { content: JSON.stringify(REPLY) } }] }, seen));
+  const est = await g('estimateEatout')('parmy and chips', 'TESTPERSON', 'sk-test-0123456789abcdefXYZ', mockFetch(200, { choices: [{ message: { content: JSON.stringify(REPLY) } }] }, seen));
   assert.strictEqual(seen.url, 'https://api.openai.com/v1/chat/completions');
-  assert.strictEqual(seen.opts.headers.Authorization, 'Bearer sk-test');
+  assert.strictEqual(seen.opts.headers.Authorization, 'Bearer sk-test-0123456789abcdefXYZ');
   const body = JSON.parse(seen.opts.body);
-  assert.strictEqual(body.model, 'gpt-4o-mini');
+  assert.strictEqual(body.model, 'gpt-4.1-mini');
   assert.strictEqual(body.response_format.type, 'json_schema');
   assert.ok(/Australian/.test(body.messages[0].content) && /TESTPERSON/.test(body.messages[0].content));
   assert.strictEqual(est.items.length, 2);
@@ -43,6 +43,37 @@ test('parse: tolerates code fences, drops junk/zero-kcal items, clamps negatives
   assert.throws(() => g('parseEatoutEstimate')('not json'), /readable/);
   assert.throws(() => g('parseEatoutEstimate')({ items: [], note: 'That is not food.' }), /not food/);
 });
+test('key/model cleaning: whitespace, newlines, zero-width, Bearer prefix, quotes; model typo-tolerant', () => {
+  assert.strictEqual(g('cleanEatoutKey')('  Bearer sk-abc\u200b123\n '), 'sk-abc123');
+  assert.strictEqual(g('cleanEatoutKey')('\u201csk-abc\u201d'), 'sk-abc');
+  assert.match(g('eatoutKeyProblem')('sk-ab\u2026cdefghijklmnopqrstuvwxyz'), /strange character/);
+  assert.match(g('eatoutKeyProblem')('abc-0123456789012345678'), /start with sk-/);
+  assert.strictEqual(g('eatoutKeyProblem')('sk-proj-0123456789abcdefghij'), '');
+  assert.strictEqual(g('cleanEatoutModel')(' GPT\u20114.1 mini '), 'gpt-4.1-mini');
+  assert.strictEqual(g('cleanEatoutModel')(''), 'gpt-4.1-mini');
+  assert.strictEqual(g('cleanEatoutModel')('gpt-4o'), 'gpt-4o');
+});
+test('dirty key is sent clean; user model honoured', async () => {
+  const seen = {};
+  await g('estimateEatout')('steak', 'P', ' sk-test-0123456789abcdefXYZ\n', mockFetch(200, { choices: [{ message: { content: JSON.stringify(REPLY) } }] }, seen), ' gpt-4o ');
+  assert.strictEqual(seen.opts.headers.Authorization, 'Bearer sk-test-0123456789abcdefXYZ');
+  assert.strictEqual(JSON.parse(seen.opts.body).model, 'gpt-4o');
+});
+test('network failure (CORS-less 401) is diagnosed via /v1/models and shows real detail', async () => {
+  const calls = [];
+  const f = async (url, opts) => { calls.push(url); if (opts.method === 'POST') throw new TypeError('Load failed');
+    return { ok: false, status: 401, json: async () => ({ error: { message: 'Incorrect API key provided: sk-test-****XYZ.', code: 'invalid_api_key' } }) }; };
+  await assert.rejects(g('estimateEatout')('steak', 'P', 'sk-test-0123456789abcdefXYZ', f), e => /rejected that API key/.test(e.message) && /401/.test(e.message) && !/sk-test-\*/.test(e.message));
+  assert.strictEqual(calls[1], 'https://api.openai.com/v1/models/gpt-4.1-mini');
+});
+test('network failure with healthy key shows the raw error', async () => {
+  const f = async (url, opts) => { if (opts.method === 'POST') throw new TypeError('Load failed'); return { ok: true, status: 200, json: async () => ({ id: 'gpt-4.1-mini' }) }; };
+  await assert.rejects(g('estimateEatout')('steak', 'P', 'sk-test-0123456789abcdefXYZ', f), /Couldn't reach OpenAI \(TypeError: Load failed\)/);
+});
+test('model 404 detail', async () => {
+  await assert.rejects(g('estimateEatout')('steak', 'P', 'sk-test-0123456789abcdefXYZ', mockFetch(404, { error: { message: 'The model gpt-9 does not exist', code: 'model_not_found' } })), /isn't available.*404: The model gpt-9/);
+});
+
 test('log: one estimate entry, multiplier + removal respected, counted in day + week', () => {
   const est = g('parseEatoutEstimate')(REPLY);
   est.items[0].mult = 0.5; // half the parmy
@@ -73,12 +104,12 @@ test('log: one estimate entry, multiplier + removal respected, counted in day + 
 test('errors: no key, bad key, no credit, offline/network, refusal', async () => {
   const est = g('estimateEatout');
   await assert.rejects(est('pizza', 'p', '', mockFetch(200, {})), /API key/);
-  await assert.rejects(est('pizza', 'p', 'k', mockFetch(401, { error: { message: 'bad' } })), /rejected/);
-  await assert.rejects(est('pizza', 'p', 'k', mockFetch(429, { error: { code: 'insufficient_quota' } })), /credit/);
-  await assert.rejects(est('pizza', 'p', 'k', async () => { throw new TypeError('Failed to fetch'); }), /reach OpenAI/);
-  await assert.rejects(est('pizza', 'p', 'k', mockFetch(200, { choices: [{ message: { refusal: 'no' } }] })), /declined/);
-  await assert.rejects(est('  ', 'p', 'k', mockFetch(200, {})), /what you ate/);
-  assert.strictEqual(await g('testEatoutKey')('k', mockFetch(200, { choices: [] })), true);
+  await assert.rejects(est('pizza', 'p', 'sk-test-0123456789abcdefXYZ', mockFetch(401, { error: { message: 'bad' } })), /rejected/);
+  await assert.rejects(est('pizza', 'p', 'sk-test-0123456789abcdefXYZ', mockFetch(429, { error: { code: 'insufficient_quota' } })), /credit/);
+  await assert.rejects(est('pizza', 'p', 'sk-test-0123456789abcdefXYZ', async () => { throw new TypeError('Failed to fetch'); }), /reach OpenAI/);
+  await assert.rejects(est('pizza', 'p', 'sk-test-0123456789abcdefXYZ', mockFetch(200, { choices: [{ message: { refusal: 'no' } }] })), /declined/);
+  await assert.rejects(est('  ', 'p', 'sk-test-0123456789abcdefXYZ', mockFetch(200, {})), /what you ate/);
+  assert.strictEqual(await g('testEatoutKey')('sk-test-0123456789abcdefXYZ', mockFetch(200, { choices: [] })), true);
 });
 (async () => {
   for (const [name, fn] of tests) {
