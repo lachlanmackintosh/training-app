@@ -576,3 +576,16 @@ body.sheet-on{overflow:hidden}
 .wrow.short .wpct{color:var(--warn)}.wrow.short .wbar i{background:var(--warn)}
 .wrow.over .wpct,.wrow.over .wflag{color:var(--rec)}.wrow.over .wbar i{background:var(--rec)}
 .wflag{font-size:11px;font-weight:600}
+
+/* Eaten out */
+.eocard .btn.small{flex:none}
+.eo-text{width:100%;box-sizing:border-box;margin:10px 0;padding:12px;border-radius:12px;border:1px solid var(--line);background:var(--card2);color:var(--text);font:inherit;font-size:16px;resize:vertical}
+.eo-text:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+.eo-mult{font:inherit;font-size:15px;padding:6px;border-radius:8px;border:1px solid var(--line);background:var(--card2);color:var(--text)}
+.eo-tot{margin:12px 0 6px;font-size:15px}
+.eo-micros{margin:6px 0 10px}.eo-micros div{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.eo-chip{font-size:12px;padding:3px 8px;border-radius:999px;background:var(--card2);border:1px solid var(--line)}
+.eo-err{color:#d9534f;margin:8px 0}.eo-ok{color:#3a9a5b;margin:8px 0}
+.eo-warn{padding:10px;border-radius:10px;background:var(--accent-soft);margin:8px 0}
+.eo-model{width:160px;display:inline-block;margin-left:6px}
+#eo-key{width:100%;box-sizing:border-box;margin:10px 0}
