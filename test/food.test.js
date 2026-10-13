@@ -163,7 +163,7 @@ test('old food storage migrates without the dropped foods', () => {
 
 test('service worker cache is the tracker build', () => {
   const sw = fs.readFileSync(path.join(root, 'sw.js'), 'utf8');
-  assert.ok(sw.indexOf("baki-v26-units") !== -1);
+  assert.ok(sw.indexOf("baki-v27-units") !== -1);
   assert.ok(sw.indexOf('./food-plan.js') !== -1);
   assert.ok(sw.indexOf('./food-log.js') !== -1);
 });
@@ -217,6 +217,7 @@ test('friendly measures for herbs, spices, salad and fats; grams for protein and
   assert.strictEqual(fa('avocado', 70), '½ avocado');
   assert.strictEqual(fa('mango', 200), '1 mango');
   assert.strictEqual(fa('potato', 250), '250 g');
+  assert.strictEqual(fa('egg', 300), '6 eggs');
   for (const sl of g.FOOD_PLAN.slots) for (const o of sl.options) for (const it of o.items.concat(o.partner || [])) {
     const m = g.FOOD_PLAN.library[it.id].measure;
     if (m) assert.ok(!/ g$/.test(fa(it.id, it.g)), it.id + ' ' + it.g);
