@@ -798,8 +798,8 @@ const EO_PERSON_SHORT = 'Lockie';
 const EO_PERSON = 'Lockie, adult male, lean and muscular, trains hard, big appetite (daily targets about 2700 kcal, 175 g protein); assume he ate a full adult portion';
 /* ---------- Eaten out (AI estimate, user's own OpenAI key in localStorage) ---------- */
 const eo = { est: null, text: '', busy: false, err: '' };
-const eoKey = () => { try { return localStorage.getItem(EO_LS.key) || ''; } catch (e) { return ''; } };
-const eoModel = () => { try { return localStorage.getItem(EO_LS.model) || EATOUT_MODEL; } catch (e) { return EATOUT_MODEL; } };
+const eoKey = () => { try { return cleanEatoutKey(localStorage.getItem(EO_LS.key) || ''); } catch (e) { return ''; } };
+const eoModel = () => { try { return cleanEatoutModel(localStorage.getItem(EO_LS.model) || EATOUT_MODEL); } catch (e) { return EATOUT_MODEL; } };
 function eatoutCard() {
   return `<div class="card eocard"><div class="row between"><div><b>Eaten out?</b><div class="muted small">Type or say the meal. AI estimates calories, macros and micros.</div></div>
     <button type="button" class="btn small" data-act="eo-open">Eaten out</button></div></div>`;
@@ -847,7 +847,7 @@ function openEatoutSettings(msg) {
     <button type="button" class="btn small ghost" data-act="eo-open">Back</button>`, 'AI settings');
 }
 function eoSaveKeyFromInput() {
-  const k = ($('#eo-key') && $('#eo-key').value || '').trim(), m = ($('#eo-model') && $('#eo-model').value || '').trim();
+  const k = cleanEatoutKey($('#eo-key') && $('#eo-key').value || ''), m0 = ($('#eo-model') && $('#eo-model').value || '').trim(), m = m0 ? cleanEatoutModel(m0) : '';
   try { if (k) localStorage.setItem(EO_LS.key, k); else localStorage.removeItem(EO_LS.key); if (m && m !== EATOUT_MODEL) localStorage.setItem(EO_LS.model, m); else localStorage.removeItem(EO_LS.model); } catch (e) { /* blocked */ }
   return k;
 }
