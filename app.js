@@ -24,7 +24,7 @@ function foodState() {
 }
 function foodDayCutoff() {
   const d = today();
-  d.setDate(d.getDate() - 21);
+  d.setDate(d.getDate() - 400); // keep past days for weekly stats
   return ymd(d);
 }
 function saveFood(st) {
@@ -49,7 +49,7 @@ const parseYmd = s => { const [y, m, d] = s.split('-').map(Number); return new D
 function today() {
   const q = new URLSearchParams(location.search).get('today'); // test override, e.g. ?today=2026-10-05
   if (q && /^\d{4}-\d{2}-\d{2}$/.test(q)) return parseYmd(q);
-  const n = new Date(); return new Date(n.getFullYear(), n.getMonth(), n.getDate(), 12);
+  return parseYmd(brisbaneYmd()); // calendar day in Australia/Brisbane, whatever the phone's zone
 }
 const todayStr = () => ymd(today());
 const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
@@ -773,11 +773,29 @@ function paintMealChecks() {
   });
   paintingMeals = false;
 }
+const ui2 = { weekOff: 0 };
+const fmtN = (v, unit) => { const r = Math.abs(v) >= 100 ? Math.round(v) : Math.round(v * 10) / 10; return comma(r) + (unit ? ' ' + unit : ''); };
+function renderWeek(st) {
+  const ref = addDaysYmd(todayStr(), -7 * ui2.weekOff);
+  const w = weekReport(st, ref, todayStr());
+  const lbl = ds => { const d = parseYmd(ds); return d.getDate() + ' ' + MONTHS[d.getMonth()].slice(0, 3); };
+  const title = ui2.weekOff === 0 ? 'This week' : ui2.weekOff === 1 ? 'Last week' : lbl(w.start) + ' – ' + lbl(w.end);
+  const strip = w.strip.map(d => `<div class="wday${d.today ? ' now' : ''}${d.has ? '' : ' empty'}"><div class="wd">${DAYS[parseYmd(d.date).getDay()].slice(0, 1)}</div>${d.has ? `<div class="wk">${comma(Math.round(d.kcal))}</div><div class="wp">${Math.round(d.protein)}g P</div><div class="wm">${d.microHit}/${d.microTotal}</div>` : `<div class="wk muted">${d.future ? '' : '–'}</div>`}</div>`).join('');
+  const row = r => `<div class="wrow${r.over ? ' over' : r.short ? ' short' : ''}"><div class="wname">${esc(r.name)}${r.over ? ' <span class="wflag">over limit</span>' : ''}</div><div class="wval">${fmtN(r.value, r.unit)} <span class="muted">/ ${fmtN(r.target, r.unit)}</span></div><div class="wavg muted small">avg ${fmtN(r.avgLogged, r.unit)}/logged day · ${fmtN(r.avg, r.unit)}/day over 7</div><div class="wpct">${r.pct}%</div><div class="wbar"><i style="width:${Math.min(100, r.pct)}%"></i></div></div>`;
+  const shorts = w.micros.filter(r => r.short).length;
+  return `<details class="card fold week" data-keep="week"${ui2.weekOff ? ' open' : ''}><summary>${esc(title)} · ${w.logged}/7 days logged</summary>
+    <div class="row between wnav"><button type="button" class="btn ghost sm" data-act="week-prev">‹ Earlier</button><span class="muted small">${lbl(w.start)} – ${lbl(w.end)}</span><button type="button" class="btn ghost sm" data-act="week-next"${ui2.weekOff ? '' : ' disabled'}>Later ›</button></div>
+    <div class="wstrip">${strip}</div><div class="muted small">Per day: kcal · protein · micros hit.</div>
+    <h3 class="wh">Macros <span class="muted small">week total vs target × 7</span></h3>${w.macros.map(row).join('')}
+    <h3 class="wh">Micronutrients <span class="muted small">${w.micros.length - shorts}/${w.micros.length} hit</span></h3>${w.micros.map(row).join('')}
+  </details>`;
+}
+
 function renderFood() {
   const st = foodState();
   view().innerHTML = `<div class="row between"><h1>Food</h1><button type="button" class="rulesbtn" data-act="food-rules">Rules</button></div>
     <div class="muted small">Morning snack, then Meals 1, 2 and 3. Today against your targets.</div>
-    ${renderMeals(st)}`;
+    ${renderMeals(st)}${renderWeek(st)}`;
   paintMealChecks();
 }
 
@@ -941,6 +959,8 @@ document.addEventListener('click', e => {
   else if (act === 'opt-open') openSheet(b.dataset.opt);
   else if (act === 'sheet-close') closeSheet();
   else if (act === 'food-rules') openFoodRules();
+  else if (act === 'week-prev') { ui2.weekOff++; refreshFoodViews(); }
+  else if (act === 'week-next') { ui2.weekOff = Math.max(0, ui2.weekOff - 1); refreshFoodViews(); }
   else if (act === 'opt-select' || act === 'opt-remove') {
     const op = act === 'opt-select' ? 'select_option' : 'unselect_option';
     const applied = applyFoodActions(foodState(), [{ op, option: b.dataset.opt }], todayStr());
@@ -988,6 +1008,12 @@ function route() {
   if (p !== 'workout' || !route.keep) scrollTo(0, 0);
 }
 window.addEventListener('hashchange', route);
+let shownDay = todayStr();
+function checkDayRollover() { const t = todayStr(); if (t !== shownDay) { shownDay = t; ui2.weekOff = 0; route(); } }
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') checkDayRollover(); });
+window.addEventListener('pageshow', checkDayRollover);
+window.addEventListener('focus', checkDayRollover);
+setInterval(checkDayRollover, 30000);
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && timer && timerIv) runTimer(); });
 route();
 if (timer && timer.end > Date.now()) runTimer(); else if (timer) { timer = null; localStorage.removeItem(LS.timer); }
