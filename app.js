@@ -687,7 +687,7 @@ function logCard(day) {
     const sub = `<div class="muted small">${esc(label(item) + casual)}</div>`;
     if (item.flat) {
       const kcal = item.tot && item.tot.kcal ? Math.round(item.tot.kcal) : 0;
-      return `<div class="irow"><div class="irow-name"><b>${esc(name)}${badge}</b><div class="muted small">About ${comma(kcal)} kcal</div></div><button type="button" class="linkbtn" data-act="log-del" data-uid="${esc(item.uid)}">Remove</button></div>`;
+      return `<div class="irow"><div class="irow-name"><b>${esc(name)}${badge}</b><div class="muted small">${item.out ? 'Eaten out · ' : ''}About ${comma(kcal)} kcal</div></div><button type="button" class="linkbtn" data-act="log-del" data-uid="${esc(item.uid)}">Remove</button></div>`;
     }
     const ms = !item.estimate && measureOf(item.id);
     const u = ms ? ms.many : item.estimate ? 'g' : unitOf(item.id);
@@ -702,7 +702,7 @@ function renderMeals(st) {
   const day = normaliseFoodDay(st.days && st.days[todayStr()], st.picks);
   return dashHtml(st) + `<div class="sect">Meals</div>` + (FOOD_PLAN.slots || []).map(sl => slotCard(day, sl)).join('') +
     multiCard(day, 'Snacks & drinks', snackOrder(FOOD_PLAN.snacks || [], todayStr()), 'Add as many as you have. The first three are the daily drinks.') +
-    multiCard(day, 'Supplements', FOOD_PLAN.supplements || [], 'Daily, with Meal 1. Tap for how to take.') + logCard(day) +
+    multiCard(day, 'Supplements', FOOD_PLAN.supplements || [], 'Daily, with Meal 1. Tap for how to take.') + eatoutCard() + logCard(day) +
     `<details class="card fold" data-keep="rules"><summary>How to eat this</summary><ul class="bul small">${FOOD_PLAN.rules.map(r => `<li>${esc(r)}</li>`).join('')}</ul></details>`;
 }
 function infoHtml(info) {
@@ -793,6 +793,111 @@ function renderWeek(st) {
   </details>`;
 }
 
+const EO_LS = { key: 'lockie.openai.key', model: 'lockie.openai.model' };
+const EO_PERSON_SHORT = 'Lockie';
+const EO_PERSON = 'Lockie, adult male, lean and muscular, trains hard, big appetite (daily targets about 2700 kcal, 175 g protein); assume he ate a full adult portion';
+/* ---------- Eaten out (AI estimate, user's own OpenAI key in localStorage) ---------- */
+const eo = { est: null, text: '', busy: false, err: '' };
+const eoKey = () => { try { return localStorage.getItem(EO_LS.key) || ''; } catch (e) { return ''; } };
+const eoModel = () => { try { return localStorage.getItem(EO_LS.model) || EATOUT_MODEL; } catch (e) { return EATOUT_MODEL; } };
+function eatoutCard() {
+  return `<div class="card eocard"><div class="row between"><div><b>Eaten out?</b><div class="muted small">Type or say the meal. AI estimates calories, macros and micros.</div></div>
+    <button type="button" class="btn small" data-act="eo-open">Eaten out</button></div></div>`;
+}
+function eoHead(title) {
+  return `<div class="row between"><span class="kicker">Eaten out</span><span><button type="button" class="linkbtn" data-act="eo-settings">Settings</button> <button type="button" class="linkbtn" data-act="sheet-close">Close</button></span></div><h2 class="sheet-t">${esc(title)}</h2>`;
+}
+function eoSpeech() { return window.SpeechRecognition || window.webkitSpeechRecognition || null; }
+function openEatout() {
+  sheetOpt = 'eatout';
+  const noKey = !eoKey();
+  const est = eo.est;
+  let body = '';
+  if (!est) {
+    body = `${noKey ? '<div class="eo-warn small">No API key yet. Tap <b>Settings</b> to paste your OpenAI key.</div>' : ''}
+      <div class="muted small">What did you have and how much? E.g. "chicken parmy, chips and salad, half a glass of red" or "shared a margherita pizza".</div>
+      <textarea id="eo-text" class="eo-text" rows="4" maxlength="1500" placeholder="Tap here, then the mic on your keyboard to speak">${esc(eo.text)}</textarea>
+      ${eoSpeech() ? '<button type="button" class="btn small ghost" data-act="eo-mic" id="eo-mic">🎤 Speak</button>' : ''}
+      ${eo.err ? `<div class="eo-err small">${esc(eo.err)}</div>` : ''}
+      <button type="button" class="btn sheetbtn" data-act="eo-estimate"${eo.busy ? ' disabled' : ''}>${eo.busy ? 'Estimating…' : 'Estimate'}</button>`;
+  } else {
+    const tot = eatoutTotals(est);
+    const rows = est.items.map((it, i) => `<div class="irow eo-item"><div class="irow-name"><b>${esc(it.name)}</b><div class="muted small">${esc(it.portion)} · ${comma(Math.round(it.n.kcal * it.mult))} kcal · P ${Math.round(it.n.protein_g * it.mult)} g</div></div>
+      <select class="eo-mult" data-eo-mult="${i}" aria-label="${esc(it.name)} portion">${EATOUT_MULTS.map(m => `<option value="${m}"${m === it.mult ? ' selected' : ''}>${m}×</option>`).join('')}</select>
+      <button type="button" class="linkbtn" data-act="eo-rm" data-i="${i}">Remove</button></div>`).join('');
+    const micro = FOOD_PLAN.nutrients.slice(0, 25).map(n => `<span class="eo-chip">${esc(n.name)} ${Math.round(tot[n.key] * 10) / 10} ${esc(n.unit)}</span>`).join('');
+    body = `<div class="muted small">Estimate for ${esc(EO_PERSON_SHORT)}'s portion. Adjust or remove items, then log it.</div>${rows}
+      <div class="eo-tot"><b>${comma(Math.round(tot.kcal))} kcal</b> · P ${Math.round(tot.protein_g)} g · C ${Math.round(tot.carbs_g)} g · F ${Math.round(tot.fat_g)} g · Fibre ${Math.round(tot.fibre_g)} g</div>
+      <details class="eo-micros"><summary class="small">Micronutrients</summary><div>${micro}</div></details>
+      ${est.note ? `<div class="muted small">${esc(est.note)}</div>` : ''}
+      <button type="button" class="btn sheetbtn" data-act="eo-log">Log it</button>
+      <button type="button" class="btn small ghost" data-act="eo-back">Start again</button>`;
+  }
+  showSheet(eoHead(est ? 'Check the estimate' : 'Log a meal out') + body, 'Eaten out');
+}
+function openEatoutSettings(msg) {
+  sheetOpt = 'eatout-settings';
+  const k = eoKey();
+  showSheet(eoHead('AI settings') + `<div class="muted small">Paste an OpenAI API key (starts with <b>sk-</b>). It's saved only on this phone, never in the app's code. Each meal estimate costs well under 1 cent.</div>
+    <input id="eo-key" class="keyin" type="password" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="sk-…" value="${esc(k)}">
+    <div class="muted small">Model: <input id="eo-model" class="keyin eo-model" autocapitalize="off" spellcheck="false" value="${esc(eoModel())}"></div>
+    ${msg ? `<div class="small ${msg.ok ? 'eo-ok' : 'eo-err'}">${esc(msg.text)}</div>` : ''}
+    <div class="grid2"><button type="button" class="btn small" data-act="eo-key-save">Save</button><button type="button" class="btn small ghost" data-act="eo-key-test">Test key</button></div>
+    ${k ? '<button type="button" class="linkbtn" data-act="eo-key-clear">Remove key</button>' : ''}
+    <button type="button" class="btn small ghost" data-act="eo-open">Back</button>`, 'AI settings');
+}
+function eoSaveKeyFromInput() {
+  const k = ($('#eo-key') && $('#eo-key').value || '').trim(), m = ($('#eo-model') && $('#eo-model').value || '').trim();
+  try { if (k) localStorage.setItem(EO_LS.key, k); else localStorage.removeItem(EO_LS.key); if (m && m !== EATOUT_MODEL) localStorage.setItem(EO_LS.model, m); else localStorage.removeItem(EO_LS.model); } catch (e) { /* blocked */ }
+  return k;
+}
+async function eoAction(act, b) {
+  if (act === 'eo-open') { openEatout(); return true; }
+  if (act === 'eo-settings') { if ($('#eo-text')) eo.text = $('#eo-text').value; openEatoutSettings(); return true; }
+  if (act === 'eo-key-save') { const k = eoSaveKeyFromInput(); openEatoutSettings({ ok: true, text: k ? 'Saved.' : 'Key removed.' }); return true; }
+  if (act === 'eo-key-clear') { try { localStorage.removeItem(EO_LS.key); } catch (e) { /* */ } openEatoutSettings({ ok: true, text: 'Key removed.' }); return true; }
+  if (act === 'eo-key-test') {
+    const k = eoSaveKeyFromInput();
+    b.disabled = true; b.textContent = 'Testing…';
+    try { await testEatoutKey(k, null, eoModel()); openEatoutSettings({ ok: true, text: 'Key works. You\'re set.' }); }
+    catch (e) { openEatoutSettings({ ok: false, text: e.message }); }
+    return true;
+  }
+  if (act === 'eo-mic') {
+    const SR = eoSpeech(); if (!SR) return true;
+    const r = new SR(); r.lang = 'en-AU'; r.interimResults = false;
+    b.textContent = '🎤 Listening…';
+    r.onresult = ev => { const t = Array.from(ev.results).map(x => x[0].transcript).join(' '); const ta = $('#eo-text'); if (ta) ta.value = (ta.value ? ta.value + ' ' : '') + t; };
+    r.onend = () => { b.textContent = '🎤 Speak'; };
+    r.onerror = () => { b.textContent = '🎤 Speak'; toast('Mic not available. Use the keyboard mic instead.'); };
+    try { r.start(); } catch (e) { b.textContent = '🎤 Speak'; }
+    return true;
+  }
+  if (act === 'eo-estimate') {
+    eo.text = ($('#eo-text') && $('#eo-text').value || '').trim();
+    eo.err = ''; eo.busy = true; openEatout();
+    try { eo.est = await estimateEatout(eo.text, EO_PERSON, eoKey(), null, eoModel()); }
+    catch (e) { eo.err = e.message || 'Something went wrong. Try again.'; }
+    eo.busy = false;
+    if (sheetOpt === 'eatout') openEatout();
+    return true;
+  }
+  if (act === 'eo-rm') { eo.est.items.splice(Number(b.dataset.i), 1); if (!eo.est.items.length) eo.est = null; openEatout(); return true; }
+  if (act === 'eo-back') { eo.est = null; openEatout(); return true; }
+  if (act === 'eo-log') {
+    const res = addEatoutEntry(foodState(), todayStr(), eo.est);
+    if (res.changed) { saveFood(res.state); toast(res.change); eo.est = null; eo.text = ''; closeSheet(); refreshFoodViews(); }
+    else toast(res.skip || 'Nothing to log');
+    return true;
+  }
+  return false;
+}
+document.addEventListener('change', e => {
+  const s = e.target.closest && e.target.closest('[data-eo-mult]');
+  if (!s || !eo.est) return;
+  const it = eo.est.items[Number(s.dataset.eoMult)];
+  if (it) { it.mult = Number(s.value); openEatout(); }
+});
 function renderFood() {
   const st = foodState();
   view().innerHTML = `<div class="row between"><h1>Food</h1><button type="button" class="rulesbtn" data-act="food-rules">Rules</button></div>
@@ -961,6 +1066,7 @@ document.addEventListener('click', e => {
   else if (act === 'opt-open') openSheet(b.dataset.opt);
   else if (act === 'sheet-close') closeSheet();
   else if (act === 'food-rules') openFoodRules();
+  else if (act.startsWith('eo-')) eoAction(act, b);
   else if (act === 'week-prev') { ui2.weekOff++; refreshFoodViews(); }
   else if (act === 'week-next') { ui2.weekOff = Math.max(0, ui2.weekOff - 1); refreshFoodViews(); }
   else if (act === 'opt-select' || act === 'opt-remove') {

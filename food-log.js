@@ -177,7 +177,12 @@ function sanitiseItem(raw, seen) {
         if (n != null && n > 0) { tot[k] = n; any = true; }
       }
       if (!any || tot.kcal == null) return null;
-      return { uid, estimate: true, flat: true, name, g: 0, tot, per: {}, meal: '', slot: '' };
+      const o = { uid, estimate: true, flat: true, name, g: 0, tot, per: {}, meal: '', slot: '' };
+      if (raw.out === true) {
+        o.out = true;
+        if (Array.isArray(raw.parts)) o.parts = raw.parts.slice(0, 15).filter(x => x && typeof x === 'object').map(x => ({ name: cleanFoodName(x.name).slice(0, 60), portion: cleanFoodName(x.portion).slice(0, 60), mult: finite(x.mult, 2) || 1, kcal: finite(x.kcal, 5000) || 0 })).filter(x => x.name);
+      }
+      return o;
     }
     const g = clampG(raw.g);
     if (!g) return null;
