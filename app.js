@@ -1,7 +1,7 @@
 /* Baki Program (Lockie Training Program) — plain JS, no build step. Data in data.js. */
 (() => {
 'use strict';
-const LS = { log: 'lockie.log.v1', draft: 'lockie.draft.v1', settings: 'lockie.settings.v1', timer: 'lockie.timer.v1', food: 'lockie.food.v2' };
+const LS = { log: 'lockie.log.v1', draft: 'lockie.draft.v1', settings: 'lockie.settings.v1', timer: 'lockie.timer.v1', food: 'lockie.food.v2', nightly: 'lockie.nightly.v1' };
 // Ask AI was removed (Oct 2026): clear its old keys (Gemini key, chat, undo) from the phone.
 try { ['lockie.gemini.key', 'lockie.ai.chat.v1', 'lockie.ai.speak.v1', 'lockie.ai.undo.v1'].forEach(k => localStorage.removeItem(k)); } catch (e) { /* storage blocked */ }
 const DEFAULT_SETTINGS = { start: '2026-10-05', rampEveryBlock: true, deload: false, swaps: {} };
@@ -88,12 +88,13 @@ function target(ex, phase) {
   if (phase === 'deload') sets = Math.max(1, Math.ceil(sets / 2));
   const metric = MOV[partsOf(ex)[0]].metric || 'reps';
   let reps;
-  if (ex.maxTime) reps = 'max time';
+  if (maxTime && (sw.timeText || ex.timeText)) reps = isSwapped(ex) ? (sw.timeText || ex.timeText) : ex.timeText;
+  else if (ex.maxTime) reps = 'max time';
   else if (sw.holdTime) reps = 'hold';
   else if (metric === 'm') reps = `${max} m`;
   else reps = min === max ? `${min}` : `${min}–${max}`;
   if (ex.each && !maxTime) reps += ` ${ex.each}`;
-  return { sets, min, max, reps, maxTime, text: `${sets} × ${reps}` };
+  return { sets, min, max, reps, maxTime, timeText: maxTime && (sw.timeText || ex.timeText) ? reps : '', text: `${sets} × ${reps}` };
 }
 function targetText(t) { // e.g. "3 sets × 8–10 reps", "3 sets × 30 m", "1 set × max time"
   const sets = `${t.sets} set${t.sets === 1 ? '' : 's'}`;
@@ -101,7 +102,8 @@ function targetText(t) { // e.g. "3 sets × 8–10 reps", "3 sets × 30 m", "1 s
   const [n, ...rest] = t.reps.split(' ');
   return `${sets} × ${n} reps${rest.length ? ' ' + rest.join(' ') : ''}`;
 }
-function rowTarget(t) { return t.maxTime ? (t.reps === 'hold' ? 'hold' : 'max time') : t.reps; }
+function rowTarget(t) { return t.maxTime ? (t.timeText ? t.timeText.replace(/ hold$/, '') : t.reps === 'hold' ? 'hold' : 'max time') : t.reps; }
+const restOf = ex => isSwapped(ex) && ex.swap.rest != null ? ex.swap.rest : ex.rest;
 const restText = s => !s ? 'No rest' : s >= 60 ? (s % 60 ? `${Math.floor(s / 60)} min ${s % 60} s` : `${s / 60} min`) : `${s} s`;
 const ytUrl = name => 'https://www.youtube.com/results?search_query=' + encodeURIComponent(name + ' form').replace(/%20/g, '+');
 const metricOf = m => (MOV[m].metric || 'reps');
@@ -254,6 +256,7 @@ function renderHome() {
     <div class="cardtitle">${esc(mo.name)}</div>
     <div class="muted small">${esc(mo.moves.slice(0, 4).map(x => x[0]).join(' · '))} …</div>
     <a class="btn ghost" style="margin-top:10px" href="#/mobility/${mk}">Start mobility</a></div>
+  ${nightlyCard(ds)}
   <div class="card foodcard"><div class="row between"><b class="kicker">Today's food</b>${dash.hasLog ? `<span class="muted small">${dash.macroBars[1].pct}% protein</span>` : ''}</div>
     <div class="cardtitle">${esc(foodTitle)}</div>
     <div class="muted small">${esc(foodSub)}</div>
@@ -269,6 +272,23 @@ function renderHome() {
       <a class="btn ghost small" href="#/workout/A">Session 1</a><a class="btn ghost small" href="#/workout/B">Session 2</a>
       <a class="btn ghost small" href="#/workout/C">Session 3</a><a class="btn ghost small" href="#/hiit">HIIT</a></div></details>
   ${loggedToday.length ? `<div class="muted small" style="text-align:center">${loggedToday.length} set${loggedToday.length > 1 ? 's' : ''} logged today</div>` : ''}`;
+}
+
+/* ---------- nightly (Coach Kyle foam roll): one tick per Brisbane day ---------- */
+const nightlyDone = ds => !!load(LS.nightly, {})[ds];
+function setNightly(ds, on) {
+  const all = load(LS.nightly, {}); if (on) all[ds] = Date.now(); else delete all[ds];
+  const keys = Object.keys(all).sort(); while (keys.length > 120) delete all[keys.shift()]; // keep ~4 months
+  save(LS.nightly, all);
+}
+function nightlyStreak(ds) { const all = load(LS.nightly, {}); let n = 0; const d = parseYmd(ds); if (!all[ds]) d.setDate(d.getDate() - 1); while (all[ymd(d)]) { n++; d.setDate(d.getDate() - 1); } return n; }
+function nightlyCard(ds) {
+  const on = nightlyDone(ds), st = nightlyStreak(ds);
+  return `<div class="card nightcard${on ? ' done' : ''}" id="nightly"><div class="row between"><b class="kicker">Tonight · before bed</b><span class="muted small">${NIGHTLY.mins}+ min</span></div>
+    <div class="row between" style="gap:12px;margin-top:6px"><div><div class="cardtitle" style="margin-top:0">${esc(NIGHTLY.title)}</div>
+      <div class="muted small">${esc(NIGHTLY.sub)}</div></div>
+      <button class="tick nighttick" data-act="nightly" aria-pressed="${on}" aria-label="${on ? 'Done tonight. Tap to undo' : 'Mark foam roll done tonight'}">✓</button></div>
+    <div class="muted small" style="margin-top:8px">${on ? 'Done tonight.' : 'Not done yet tonight.'}${st > 1 ? ` ${st} nights in a row.` : ''} <a href="#/mobility">How to</a></div></div>`;
 }
 
 function countDoneSets(ex, ds, phase) {
@@ -320,17 +340,17 @@ function demoHtml(m) {
   const mv = mvOf(m), v = VIDEO[m];
   const still = mv.img ? `<img src="img/${mv.img}/0.jpg" alt="${esc(m)} still" loading="lazy">`
     : `<div class="nolink">${esc(m)}<br><small>Video thumbnail needs internet</small></div>${v ? `<img class="thumb" src="https://i.ytimg.com/vi/${v.id}/hqdefault.jpg" alt="${esc(m)} video thumbnail" loading="lazy" onerror="this.remove()">` : ''}`;
-  if (!v) return `<div class="part"><div class="demo">${still}</div><div class="demo-cap"><span>No verified video.</span><a class="yt" href="${ytUrl(m)}" target="_blank" rel="noopener">Search YouTube</a></div><p class="cue">${esc(mv.cue)}</p></div>`;
+  if (!v) return `<div class="part"><div class="demo">${still}</div><div class="demo-cap"><span>${mv.link ? esc(mv.src || 'Video opens on YouTube') : 'No verified video.'}</span><a class="yt" href="${mv.link ? esc(mv.link) : ytUrl(m)}" target="_blank" rel="noopener">${mv.link ? esc(mv.linkLabel || 'YouTube ↗') : 'Search YouTube'}</a></div><p class="cue">${esc(mv.cue)}</p></div>`;
   return `<div class="part" data-m="${esc(m)}">
     <div class="demo vid" data-vid="${v.id}">${still}
       <button class="play" data-act="play" aria-label="Play demo video: ${esc(m)}"><span class="pbtn">▶</span><span class="ptxt">Play demo${v.secs ? ' · ' + dur(v.secs) : ''}</span></button></div>
-    <div class="demo-cap"><span>${v.note ? `<span class="closest">Closest:</span> ${esc(v.note)}. ` : ''}${esc(v.title)} · <b>${esc(v.ch)}</b></span><a class="yt" href="https://www.youtube.com/watch?v=${v.id}" target="_blank" rel="noopener">YouTube ↗</a></div>
+    <div class="demo-cap"><span>${v.note ? `<span class="closest">Closest:</span> ${esc(v.note)}. ` : ''}${esc(v.title)} · <b>${esc(v.ch)}</b></span><a class="yt" href="https://www.youtube.com/watch?v=${v.id}${v.start ? '&t=' + v.start + 's' : ''}" target="_blank" rel="noopener">YouTube ↗</a></div>
     <p class="cue">${esc(mv.cue)}</p></div>`;
 }
 function playVideo(btn) {
   const demo = btn.closest('.demo'), part = btn.closest('.part'), m = part.dataset.m, v = VIDEO[m];
   if (!navigator.onLine) { toast('Videos need internet. Showing the still image.'); return; }
-  const src = `https://www.youtube-nocookie.com/embed/${v.id}?playsinline=1&autoplay=1&rel=0&modestbranding=1`;
+  const src = `https://www.youtube-nocookie.com/embed/${v.id}?playsinline=1&autoplay=1&rel=0&modestbranding=1${v.start ? '&start=' + v.start : ''}`;
   demo.classList.add('playing'); part.classList.add('playing');
   demo.innerHTML = `<iframe src="${src}" title="${esc(m)}: ${esc(v.title)}" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowfullscreen referrerpolicy="strict-origin-when-cross-origin"></iframe>
     <button class="closevid" data-act="closevid" aria-label="Close video">✕</button>`;
@@ -371,7 +391,8 @@ function exerciseCard(ex, ds, phase, idx) {
     <h3>${esc(parts.join(' + '))}${ex.main ? '<span class="badge">Main</span>' : ''}${two ? '<span class="badge ss">Superset</span>' : ''}</h3>
     ${tempoHtml(parts)}
     <div class="target big">${esc(targetText(t))}</div>
-    <div class="muted small">${ex.rest ? 'Rest ' + restText(ex.rest) + (two ? ' after both' : '') : 'No rest'}</div>
+    <div class="muted small">${restOf(ex) ? 'Rest ' + restText(restOf(ex)) + (two ? ' after both' : '') : 'No rest'}</div>
+    ${ex.note && !sw ? `<div class="note normal small" style="margin-top:8px">${esc(ex.note)}</div>` : ''}
     <div class="last">${lastHtml}</div>
     <div class="sets">${rows}</div>
     <button class="swap${sw ? ' on' : ''}" data-act="swap" data-ex="${ex.id}">⇄ ${sw ? `Swapped. Tap for original: ${esc(ex.parts.join(' + '))}` : `Swap: ${esc(ex.swap.label)}`}</button>
@@ -458,6 +479,10 @@ function renderMobility() {
     <div class="card hero"><div class="muted small">Today · ${DAYS[mo.day]}</div><h2 style="margin:4px 0 2px">${esc(mo.name)}</h2>
       <div class="muted small">${mobMins(tk)} min · ${mo.moves.length} moves · neck-hump drills included</div>
       <a class="btn" style="margin-top:12px" href="#/mobility/${tk}">Start ${esc(mo.name)}</a></div>
+    <h2>Every night</h2>
+    <div class="card"><div class="row between"><b>${esc(NIGHTLY.title)}</b><span class="muted small">${nightlyDone(todayStr()) ? '✓ Done tonight' : NIGHTLY.mins + '+ min'}</span></div>
+      <div class="muted small" style="margin:4px 0 8px">Coach Kyle: “spend 5+ minutes each night letting your chest open and spine decompress.” Tick it off on Home.</div>
+      <div class="parts">${demoHtml(NIGHTLY.move)}</div></div>
     <h2>Pick any session</h2>
     <div class="card"><ul class="list">${MOB_ORDER.map(k => `<li><a class="item mobitem" href="#/mobility/${k}" data-k="${k}"><span><b>${DAYS[MOBILITY[k].day]}</b><br><span class="muted small">${esc(MOBILITY[k].name)}</span></span><span class="muted small">${mobMins(k)} min ›</span></a></li>`).join('')}</ul></div>
     <details class="card fold"><summary>Posture cues</summary><ul class="bul small">${AT_CUES.map(c => `<li>${esc(c)}</li>`).join('')}</ul>
@@ -1050,7 +1075,9 @@ document.addEventListener('click', e => {
     }
     saveLog(); row.classList.add('done');
     if (countDoneSets(ex, ds, bi.phase) === target(ex, bi.phase).sets) $('#ex-' + ex.id).classList.add('complete');
-    startRest(ex.rest, parts.join(' + '));
+    startRest(restOf(ex), parts.join(' + '));
+  } else if (act === 'nightly') {
+    const ds = todayStr(); setNightly(ds, !nightlyDone(ds)); const c = $('#nightly'), tmp = document.createElement('div'); tmp.innerHTML = nightlyCard(ds); if (c) c.replaceWith(tmp.firstElementChild);
   } else if (act === 'swap') {
     const id = b.dataset.ex; settings.swaps[id] = !settings.swaps[id]; if (!settings.swaps[id]) delete settings.swaps[id]; save(LS.settings, settings);
     const y = scrollY; renderWorkout(view().dataset.day); scrollTo(0, y);

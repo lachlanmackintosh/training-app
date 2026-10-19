@@ -44,6 +44,7 @@ const MOV = {
   'Standing calf raise': { img: 'Standing_Calf_Raises', match: 'exact', src: 'Standing Calf Raises', cue: 'Full stretch at the bottom, pause, rise all the way onto your toes. No bouncing.', lower: true },
   'Seated calf raise': { img: 'Seated_Calf_Raise', match: 'exact', src: 'Seated Calf Raise', cue: 'Full stretch at the bottom, pause, push up high and squeeze. No bouncing.', lower: true },
   'Hanging knee raise': { added: true, img: 'Hanging_Leg_Raise', match: 'closest', src: 'Hanging Leg Raise (bend your knees)', cue: 'Hang still, curl the knees up to your chest by tilting the pelvis. Lower slowly, no swinging.' },
+  'Prone cobra hold': { link: 'https://www.youtube.com/watch?v=0RAs3-Yx8oo', linkLabel: 'Kyle\u2019s video (Mind Pump) \u2197', src: 'Coach Kyle: \u201cprone cobra is the GOAT\u201d', cue: 'Lie face down, arms by your sides. Squeeze your shoulder blades back and down, lift your chest a few cm off the floor, thumbs out, palms down. Neck long, look at the floor. Breathe and hold.', metric: 'sec', bw: true },
   'Cable crunch': { img: 'Cable_Crunch', match: 'exact', src: 'Cable Crunch', cue: 'Kneel, rope by your head. Crunch your ribs down to your hips; hips stay still.' },
 
   // ---------- Day C ----------
@@ -94,7 +95,9 @@ const PROGRAM = {
     { id: 'B6', group: 'muscle', parts: ['Walking lunge'], sets: 3, min: 10, max: 10, each: 'each leg', rest: 90, swap: { label: 'Bulgarian split squat', parts: ['Bulgarian split squat'] } },
     { id: 'B7', group: 'muscle', parts: ['Dips'], sets: 3, min: 8, max: 12, rest: 90, swap: { label: 'Close-grip bench', parts: ['Close-grip bench'] } },
     { id: 'B8', group: 'muscle', parts: ['Standing calf raise'], sets: 3, min: 15, max: 20, rest: 60, swap: { label: 'Seated calf raise', parts: ['Seated calf raise'] } },
-    { id: 'B9', group: 'muscle', parts: ['Hanging knee raise'], sets: 3, min: 10, max: 12, rest: 60, swap: { label: 'Cable crunch', parts: ['Cable crunch'] } }
+    { id: 'B9', group: 'muscle', parts: ['Hanging knee raise'], sets: 3, min: 10, max: 12, rest: 60, swap: { label: 'Cable crunch', parts: ['Cable crunch'] } },
+    // Coach Kyle (Oct 2026): one long prone cobra hold to finish. Swap = the build-up version.
+    { id: 'B10', group: 'posture', parts: ['Prone cobra hold'], sets: 1, maxTime: true, timeText: '3+ min hold', rest: 0, note: 'Can\u2019t hold 3 min yet? Swap to the build-up: 3 \u00d7 60 s.', swap: { label: 'Build-up: 3 \u00d7 60 s holds', parts: ['Prone cobra hold'], sets: 3, holdTime: true, timeText: '60 s hold', rest: 60 } }
   ]},
   C: { key: 'C', day: 'Friday', title: 'Session 3', focus: 'Shoulders + Arms', exercises: [
     { id: 'C1', group: 'explosive', parts: ['Med-ball rotational throw'], sets: 3, min: 5, max: 5, each: 'each side', rest: 60, swap: { label: 'Cable woodchop (fast)', parts: ['Cable woodchop (fast)'] } },
@@ -200,7 +203,7 @@ const NUTRITION = { kcal: 2750, protein: 178, carbs: 255, fat: 120 };
 
 
 
-const GROUP_LABEL = { explosive: 'Explosive: fast and fresh', main: 'Main lifts', muscle: 'Muscle work', finisher: 'Finisher: neck and grip' };
+const GROUP_LABEL = { explosive: 'Explosive: fast and fresh', main: 'Main lifts', muscle: 'Muscle work', finisher: 'Finisher: neck and grip', posture: 'Finisher: posture' };
 
 /* Demo videos (YouTube, embedded via youtube-nocookie on tap). Every ID was checked on 1 Oct 2026:
    oEmbed returned 200 with the title/channel below, and the watch page reported playable + embeddable. */
@@ -280,7 +283,7 @@ const TEMPO_GROUPS = {
   explosive: ['Med-ball slam', 'Kettlebell swing', 'Broad jump', 'Box jump', 'Squat jump', 'Med-ball chest pass', 'Explosive push-up', 'Med-ball rotational throw', 'Cable woodchop (fast)', 'Lateral bound', 'Skater hop'],
   power: ['Trap bar deadlift', 'Conventional deadlift', 'Back squat', 'Leg press or hack squat', 'Incline barbell bench', 'Flat DB bench', 'Military press', 'Seated DB shoulder press', 'Romanian deadlift', 'DB RDL or lying leg curl', 'Weighted pull-up', 'Wide-grip lat pulldown', 'Barbell row', 'Chest-supported DB row'],
   controlled: ['Incline DB press', 'Incline barbell or machine press', 'DB lateral raise', 'Cable lateral raise', 'Hammer curl', 'Skull-crusher', 'Rope hammer curl', 'Overhead DB extension', 'Neck curl', 'Neck extension', 'Plate-loaded neck harness', 'Walking lunge', 'Bulgarian split squat', 'Dips', 'Close-grip bench', 'Standing calf raise', 'Seated calf raise', 'Hanging knee raise', 'Cable crunch', 'Close-grip cable row', 'Seated machine row', 'Rear delt fly', 'Shrug', 'Face pull', 'DB shrug', 'Incline DB curl', 'Rope pushdown', 'EZ bar curl', 'Overhead cable extension', 'Reverse curl', 'Wrist roller'],
-  brace: ['Dead hang', 'Farmer hold', 'Farmer carry', 'Trap bar hold']
+  brace: ['Dead hang', 'Farmer hold', 'Farmer carry', 'Trap bar hold', 'Prone cobra hold']
 };
 for (const [k, list] of Object.entries(TEMPO_GROUPS)) for (const m of list) MOV[m].tempo = k;
 
@@ -327,6 +330,7 @@ const MOB = {
   'Happy baby': { cue: 'Lie on your back, hold the outsides of your feet, knees wide. Gently pull the knees toward the floor, lower back down.' },
   'Sphinx pose': { cue: 'Lie face down, forearms under your shoulders. Lift the chest gently, neck long, shoulders down.' },
   'Inchworm': { img: 'Inchworm', match: 'exact', cue: 'Stand, bend down and walk the hands out to a plank. Walk the feet in toward the hands, legs as straight as you can.' },
+  'Long foam roller chest opener': { neck: true, cue: 'Lie lengthways on a long foam roller, head and tailbone both on it, knees bent, feet flat. Let your arms fall out to the sides, palms up, and let your chest open and spine decompress. Slow breaths, 5+ min.' },
   // HIIT technique demos
   'Burpee': { cue: 'Squat, hands down, jump the feet back to a plank, chest to the floor, jump the feet in, jump up. Steady rhythm.' },
   'Sprawl': { cue: 'From fight stance, drop the hands and shoot the legs back, hips down hard. Bounce back up to stance fast.' },
@@ -343,6 +347,8 @@ const MOBILITY = {
   sat: { day: 6, name: 'Ankles + squat depth', moves: [['Ankle CARs', 90, 'sides'], ['Knee-to-wall ankle mobilisation', 120, 'sides'], ['Wall calf stretch', 120, 'sides'], ['Tibialis raise', 60], ['Goblet squat pry', 120], ['Deep squat hold', 120], ['Frog stretch', 90], ['Couch stretch', 120, 'sides'], ['Chin tuck', 60], ['Foam roller T-spine extension', 60], ['Semi-supine rest', 120]] },
   sun: { day: 0, name: 'Recovery flow + semi-supine', moves: [['Crocodile breathing', 90], ['Cat-cow', 60], ["Child's pose", 90], ['Sphinx pose', 60], ['Supine twist', 120, 'sides'], ['Happy baby', 60], ['Pigeon stretch', 120, 'sides'], ['Strap hamstring stretch', 120, 'sides'], ['Supine chin-tuck head lift', 60], ['Semi-supine rest', 300]] }
 };
+/* Coach Kyle (Oct 2026): every night before bed, tick it off on Home. Resets each Brisbane day. */
+const NIGHTLY = { id: 'foamroll', move: 'Long foam roller chest opener', title: 'Foam roll before bed', mins: 5, sub: '5+ min lying lengthways on a long foam roller. Chest opens, spine decompresses. Great for winding down.' };
 const MOB_ORDER = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
 /* Alexander Technique-style posture cues: short, rotate through the session. */
 const AT_CUES = ['Let your neck be free.', 'Let your head go forward and up, not pulled back or down.', 'Let your back lengthen and widen.', 'Let your knees go forward and away.', 'Notice tension, then let it go. Don\u2019t force a \u201cgood posture\u201d.', 'Breathe out fully. Let the in-breath happen on its own.'];
@@ -390,6 +396,7 @@ Object.assign(VIDEO, {
   "Happy baby": { id: "DsuQQMzFU-4", title: "How to Do the Happy Baby Pose: A Guide from Physical Therapists", ch: "Hinge Health", secs: 76 },
   "Sphinx pose": { id: "-J9zcJYACrk", title: "Sphinx Pose for Spine Health", ch: "BioSpine Institute", secs: 80 },
   "Inchworm": { id: "VSp0z7Mp5IU", title: "How to Do an Inchworm | Abs Workout", ch: "Howcast", secs: 88 },
+  "Long foam roller chest opener": { id: "zB3LbbtJMcU", start: 66, title: "Coach Kyle's pick: The 10 minute foam roller spinal stretch (from 1:06)", ch: "Physio REHAB" },
   "Burpee": { id: "G2hv_NYhM-A", title: "How To Do Burpees With Proper Form", ch: "BuiltLean®", secs: 69 },
   "Sprawl": { id: "YyA0JAnK5l8", title: "Sprawl Solo Drill - Wrestling for MMA", ch: "Flow Athletics", secs: 129 },
   "Rower technique": { id: "4zWu1yuJ0_g", title: "Correct Rowing Machine Technique, Improve Your Rowing  | Concept2", ch: "concept2usa", secs: 113 },

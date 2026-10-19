@@ -589,3 +589,7 @@ body.sheet-on{overflow:hidden}
 .eo-warn{padding:10px;border-radius:10px;background:var(--accent-soft);margin:8px 0}
 .eo-model{width:160px;display:inline-block;margin-left:6px}
 #eo-key{width:100%;box-sizing:border-box;margin:10px 0}
+
+/* nightly foam roll (Coach Kyle) */
+.nighttick{flex-shrink:0}
+.nightcard.done .nighttick{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
