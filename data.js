@@ -69,6 +69,8 @@ const MOV = {
   'Reverse curl': { img: 'Reverse_Barbell_Curl', match: 'exact', src: 'Reverse Barbell Curl', cue: 'Overhand grip, elbows by your sides. Curl up slowly, feel the forearms.' },
   'Wrist roller': { img: 'Wrist_Roller', match: 'exact', src: 'Wrist Roller', cue: 'Arms out straight, roll the weight all the way up with your wrists, then slowly back down.' },
   'Farmer carry': { img: 'Farmers_Walk', match: 'exact', src: 'Farmer\u2019s Walk', cue: 'Heavy DBs, stand tall, shoulders down, short quick steps. Don\u2019t let the weights swing.', lower: true, metric: 'm' },
+  'Sandbag carry': { img: 'Farmers_Walk', match: 'closest', src: 'Loaded carry (sandbag)', cue: 'Bear-hug the sandbag tight to your chest, or load it onto one shoulder (swap shoulders each set). Brace hard, stand tall, short quick steps. Like carrying a person out.', lower: true, metric: 'm' },
+  'Suitcase carry': { img: 'Farmers_Walk', match: 'closest', src: 'Farmer\u2019s Walk (one hand)', cue: 'One heavy DB in one hand. Stand dead straight, don\u2019t lean away from it. Walk, then switch hands.', lower: true, metric: 'm' },
   'Trap bar hold': { img: 'Trap_Bar_Deadlift', match: 'closest', src: 'Trap Bar Deadlift (hold at the top)', cue: 'Deadlift the trap bar, then hold it at the top: stand tall, shoulders down, grip hard.', metric: 'sec' }
 };
 
@@ -109,7 +111,9 @@ const PROGRAM = {
     { id: 'C7', group: 'muscle', superset: true, parts: ['Incline DB curl', 'Rope pushdown'], sets: 3, min: 10, max: 12, rest: 60, swap: { label: 'EZ bar curl + overhead cable extension', parts: ['EZ bar curl', 'Overhead cable extension'] } },
     { id: 'C8', group: 'finisher', parts: ['Reverse curl'], sets: 2, min: 12, max: 12, rest: 45, swap: { label: 'Wrist roller', parts: ['Wrist roller'] } },
     { id: 'C9', group: 'finisher', parts: ['Farmer carry'], sets: 3, min: 30, max: 30, rest: 60, swap: { label: 'Trap bar hold', parts: ['Trap bar hold'], holdTime: true } },
-    { id: 'C10', group: 'finisher', superset: true, parts: ['Neck curl', 'Neck extension'], sets: 2, min: 15, max: 15, each: 'each', rest: 45, swap: { label: 'Plate-loaded neck harness', parts: ['Plate-loaded neck harness'] } }
+    { id: 'C10', group: 'finisher', superset: true, parts: ['Neck curl', 'Neck extension'], sets: 2, min: 15, max: 15, each: 'each', rest: 45, swap: { label: 'Plate-loaded neck harness', parts: ['Plate-loaded neck harness'] } },
+    // Protector conditioning (from 9 Nov 2026): carry a person/gear. Short finisher, nothing else changed.
+    { id: 'C11', group: 'finisher', from: '2026-11-09', parts: ['Sandbag carry'], sets: 3, min: 20, max: 30, rest: 60, note: 'Bear-hug or shoulder carry, 20–30 m. Swap shoulders each set.', swap: { label: 'Farmer carry 3 × 40 m (heavier DBs)', parts: ['Farmer carry'], min: 40, max: 40 } }
   ]}
 };
 
@@ -117,7 +121,7 @@ const PROGRAM = {
 const WEEK = { 0: 'R', 1: 'A', 2: 'R', 3: 'B', 4: 'R', 5: 'C', 6: 'H' };
 const WEEK_TABLE = [
   ['Monday', 'Session 1 · Power + Back'], ['Tuesday', 'Recovery (walk, sun, surf)'], ['Wednesday', 'Session 2 · Legs + Chest'],
-  ['Thursday', 'Recovery'], ['Friday', 'Session 3 · Shoulders + Arms'], ['Saturday', 'HIIT · this week\u2019s pick'], ['Sunday', 'Recovery']
+  ['Thursday', 'Recovery'], ['Friday', 'Session 3 · Shoulders + Arms'], ['Saturday', 'HIIT · A/B from 9 Nov'], ['Sunday', 'Recovery']
 ];
 
 /* HIIT menu. Every session has a built-in interval timer. No jogging or distance running.
@@ -189,6 +193,30 @@ const HIIT = {
     phases: [{ label: 'Warm-up (very easy)', kind: 'easy', secs: 300 }, { label: 'Zone 2 steady (talk test)', kind: 'rest', secs: 2100 }, { label: 'Cool-down (very easy)', kind: 'easy', secs: 300 }] }
 };
 HIIT.z2_45.how = HIIT.z2.how;
+/* Protector conditioning (from Mon 9 Nov 2026, after exams): Saturday A/B + optional easy aerobic. */
+const COND_START = '2026-11-09';
+Object.assign(HIIT, {
+  aeroint: { name: 'Aerobic intervals', goal: 'aero', equip: 'Assault bike (rower works too)',
+    desc: '4–6 × 3–4 min hard (RPE 8), equal rest',
+    how: ['Warm up 5 min easy.', '3–4 min HARD on the assault bike: RPE 8. A few words only, steady not all-out.', 'Same time easy pedalling (RPE 2–3) to recover.', 'Timer runs 5 × 3 min. Build to 6 × 4 min over the weeks.', 'This builds the engine that lets you recover between bursts.'],
+    demos: ['Air bike technique'],
+    phases: intervals({ warm: 300, warmLabel: 'Warm-up (easy)', rounds: 5, work: 180, workLabel: 'HARD (RPE 8)', rest: 180, restLabel: 'Easy pedal', cool: 300 }) },
+  rsprint: { name: 'Repeat sprints', goal: 'anaerobic', equip: 'Grass field or track (or assault bike)',
+    desc: '6–8 × 100–200 m sprint, 60–90 s rest',
+    how: ['Warm up 8 min: brisk walk, leg swings, 3 easy build-ups.', 'Sprint 100–200 m hard (RPE 9). Fast running, never a jog.', 'Walk 60–90 s, then go again. Rest stays short on purpose: sprint again while tired.', '6–8 rounds. Stop if your speed drops off badly.', 'Bike swap: 20–30 s all-out on the assault bike, 60–90 s easy.'],
+    demos: ['Air bike technique'],
+    phases: intervals({ warm: 480, warmLabel: 'Warm-up: walk, leg swings, 3 build-ups', rounds: 8, work: 30, workLabel: 'SPRINT 100–200 m', rest: 75, restLabel: 'Walk back', cool: 300, coolLabel: 'Cool-down walk' }) },
+  groupclass: { name: 'Group class with mates', goal: 'fight', equip: 'Boxing, BJJ or MMA gym',
+    desc: 'Boxing or BJJ class, about 60 min',
+    how: ['Any Saturday: swap the A/B session for a boxing or BJJ class with mates.', 'Counts as your conditioning for the week.', 'Go hard in the rounds, easy in the drills.'],
+    phases: [{ label: 'Class', kind: 'hard', secs: 3600 }] },
+  easy: { name: 'Easy aerobic', goal: 'aero', optional: true, equip: 'Brisk walk, ruck (weighted pack, start 10–15 kg), easy ride or row',
+    desc: '30–40 min at conversational pace, any day',
+    how: ['Optional, once a week, any day. Not compulsory.', 'Brisk walk, ruck, easy ride or row. No jogging.', 'Ruck: start with 10–15 kg in the pack, pack high and tight. Add 2–3 kg only when it feels easy.', 'Conversational pace: full sentences the whole way (RPE 3–4).', 'Tick it on Home or here when done.'],
+    phases: [{ label: 'Warm-up (very easy)', kind: 'easy', secs: 300 }, { label: 'Steady, conversational pace', kind: 'rest', secs: 1500 }, { label: 'Cool-down (very easy)', kind: 'easy', secs: 300 }] }
+});
+const COND_ROTATION = ['aeroint', 'rsprint'];
+const COND_SWAPS = ['n44', 'hill', 'circuit', 'bike', 'wingate', 'emom', 'bag', 'groupclass'];
 // One HIIT day a week (Saturday): rotate every week. Deload week: Zone 2 instead.
 const HIIT_ROTATION = ['n44', 'hill', 'circuit'];
 const HIIT_ALT = { n44: 'Bike sprints or Wingate sprints', hill: 'Bike sprints or the EMOM', circuit: 'Bag rounds' };
@@ -283,7 +311,7 @@ const TEMPO_GROUPS = {
   explosive: ['Med-ball slam', 'Kettlebell swing', 'Broad jump', 'Box jump', 'Squat jump', 'Med-ball chest pass', 'Explosive push-up', 'Med-ball rotational throw', 'Cable woodchop (fast)', 'Lateral bound', 'Skater hop'],
   power: ['Trap bar deadlift', 'Conventional deadlift', 'Back squat', 'Leg press or hack squat', 'Incline barbell bench', 'Flat DB bench', 'Military press', 'Seated DB shoulder press', 'Romanian deadlift', 'DB RDL or lying leg curl', 'Weighted pull-up', 'Wide-grip lat pulldown', 'Barbell row', 'Chest-supported DB row'],
   controlled: ['Incline DB press', 'Incline barbell or machine press', 'DB lateral raise', 'Cable lateral raise', 'Hammer curl', 'Skull-crusher', 'Rope hammer curl', 'Overhead DB extension', 'Neck curl', 'Neck extension', 'Plate-loaded neck harness', 'Walking lunge', 'Bulgarian split squat', 'Dips', 'Close-grip bench', 'Standing calf raise', 'Seated calf raise', 'Hanging knee raise', 'Cable crunch', 'Close-grip cable row', 'Seated machine row', 'Rear delt fly', 'Shrug', 'Face pull', 'DB shrug', 'Incline DB curl', 'Rope pushdown', 'EZ bar curl', 'Overhead cable extension', 'Reverse curl', 'Wrist roller'],
-  brace: ['Dead hang', 'Farmer hold', 'Farmer carry', 'Trap bar hold', 'Prone cobra hold']
+  brace: ['Dead hang', 'Farmer hold', 'Farmer carry', 'Sandbag carry', 'Suitcase carry', 'Trap bar hold', 'Prone cobra hold']
 };
 for (const [k, list] of Object.entries(TEMPO_GROUPS)) for (const m of list) MOV[m].tempo = k;
 

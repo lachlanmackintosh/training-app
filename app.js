@@ -1,7 +1,7 @@
 /* Baki Program (Lockie Training Program) — plain JS, no build step. Data in data.js. */
 (() => {
 'use strict';
-const LS = { log: 'lockie.log.v1', draft: 'lockie.draft.v1', settings: 'lockie.settings.v1', timer: 'lockie.timer.v1', food: 'lockie.food.v2', nightly: 'lockie.nightly.v1' };
+const LS = { log: 'lockie.log.v1', draft: 'lockie.draft.v1', settings: 'lockie.settings.v1', timer: 'lockie.timer.v1', food: 'lockie.food.v2', nightly: 'lockie.nightly.v1', easy: 'lockie.easy.v1' };
 // Ask AI was removed (Oct 2026): clear its old keys (Gemini key, chat, undo) from the phone.
 try { ['lockie.gemini.key', 'lockie.ai.chat.v1', 'lockie.ai.speak.v1', 'lockie.ai.undo.v1'].forEach(k => localStorage.removeItem(k)); } catch (e) { /* storage blocked */ }
 const DEFAULT_SETTINGS = { start: '2026-10-05', rampEveryBlock: true, deload: false, swaps: {} };
@@ -220,10 +220,10 @@ function renderHome() {
   const loggedToday = log.filter(e => e.d === ds);
   let todayHtml;
   if (k === 'A' || k === 'B' || k === 'C') {
-    const p = PROGRAM[k]; const total = p.exercises.reduce((a, ex) => a + target(ex, bi.phase).sets, 0);
-    const done = p.exercises.reduce((a, ex) => a + countDoneSets(ex, ds, bi.phase), 0);
+    const p = PROGRAM[k], exs = activeEx(p, d); const total = exs.reduce((a, ex) => a + target(ex, bi.phase).sets, 0);
+    const done = exs.reduce((a, ex) => a + countDoneSets(ex, ds, bi.phase), 0);
     todayHtml = `<div class="muted small">Today</div><h2 style="margin:4px 0 2px">${esc(p.title)}</h2><div class="subt">${esc(sessionSub(k))}</div>
-      <div class="muted small">${p.exercises.length} exercises · about 60 min · ${done}/${total} sets done</div>
+      <div class="muted small">${exs.length} exercises · about 60 min · ${done}/${total} sets done</div>
       <a class="btn" style="margin-top:14px" href="#/workout/${k}">${done ? 'Continue workout' : 'Start workout'}</a>`;
   } else if (k === 'H') {
     const pk = hiitPick(d), o = HIIT[pk];
@@ -257,6 +257,7 @@ function renderHome() {
     <div class="muted small">${esc(mo.moves.slice(0, 4).map(x => x[0]).join(' · '))} …</div>
     <a class="btn ghost" style="margin-top:10px" href="#/mobility/${mk}">Start mobility</a></div>
   ${nightlyCard(ds)}
+  ${easyCard(ds)}
   <div class="card foodcard"><div class="row between"><b class="kicker">Today's food</b>${dash.hasLog ? `<span class="muted small">${dash.macroBars[1].pct}% protein</span>` : ''}</div>
     <div class="cardtitle">${esc(foodTitle)}</div>
     <div class="muted small">${esc(foodSub)}</div>
@@ -301,7 +302,7 @@ function renderProgram() {
   const bi = blockInfo();
   const dayCard = p => `<div class="card"><div class="row between"><div><h3>${esc(p.title)}</h3><div class="subt">${esc(p.day)} · ${esc(p.focus)}</div></div></div>
     <details class="fold"><summary>${p.exercises.length} exercises, tempo and swaps</summary>
-    ${p.exercises.map(ex => { const t = target(ex, bi.phase); return `<div class="ex-mini"><div class="row between"><div><b>${esc(ex.parts.join(' + '))}</b>${ex.main ? '<span class="badge">Main</span>' : ''}${ex.superset && ex.parts.length > 1 ? '<span class="badge ss">Superset</span>' : ''}</div></div>
+    ${p.exercises.map(ex => { const t = target(ex, bi.phase); return `<div class="ex-mini"><div class="row between"><div><b>${esc(ex.parts.join(' + '))}</b>${ex.from && todayStr() < ex.from ? '<span class="badge">Starts 9 Nov</span>' : ''}${ex.main ? '<span class="badge">Main</span>' : ''}${ex.superset && ex.parts.length > 1 ? '<span class="badge ss">Superset</span>' : ''}</div></div>
       <div class="small"><span class="target">${esc(targetText(target(Object.assign({}, ex, { id: '_' }), bi.phase)))}</span> · <span class="muted">${ex.rest ? 'rest ' + restText(ex.rest) : 'no rest'}</span></div>
       <div class="tline">${tempoChips(ex.parts)}</div>
       <div class="sw">Swap: ${esc(ex.swap.label)} ${tempoChips(ex.swap.parts)}</div></div>`; }).join('')}
@@ -317,9 +318,9 @@ function renderProgram() {
    <div class="muted small">Superset = do the two exercises back to back, then rest.</div></div>
   ${['A', 'B', 'C'].map(k => dayCard(PROGRAM[k])).join('')}
   <div class="card"><h3>HIIT</h3><div class="subt">Saturday · Fighter conditioning</div><ul class="bul small">
-   <li>One session a week, rotating: <b>${HIIT_ROTATION.map(k => esc(HIIT[k].name)).join(' → ')}</b>, then repeat.</li>
-   <li>This week: <b>${esc(HIIT[hiitPick()].name)}</b>. 8 sessions to choose from in the HIIT tab.</li>
-   <li>Deload week: Zone 2 instead. Optional Zone 2 on recovery days.</li></ul>
+   <li>From 9 Nov: <b>A Aerobic intervals ↔ B Repeat sprints</b>, alternating weeks. Until then: ${HIIT_ROTATION.map(k => esc(HIIT[k].name)).join(' → ')}.</li>
+   <li>This week: <b>${esc(HIIT[hiitPick()].name)}</b>. 11 sessions to choose from in the HIIT tab.</li>
+   <li>Deload week: Zone 2 instead. Optional easy aerobic (walk, ruck, ride, row) once a week.</li></ul>
    <a class="btn" href="#/hiit">Open HIIT</a></div>
   <div class="card"><h3>Mobility</h3><div class="subt">Every day · 15–20 min follow-along</div>
    <ul class="list">${MOB_ORDER.map(k => `<li class="row between"><span>${DAYS[MOBILITY[k].day]}</span><span class="muted">${esc(MOBILITY[k].name)}</span></li>`).join('')}</ul>
@@ -411,7 +412,7 @@ function renderWorkout(k) {
     <details class="card fold"><summary>Warm-up</summary><div>5 min easy bike, then 2 light sets of your first main lift.</div></details>
     <label class="toggle card" style="padding:10px 16px"><span><b>Short on time?</b><br><span class="muted small">Explosive moves and the 2 main lifts only</span></span><input type="checkbox" data-act="short" ${ui.short ? 'checked' : ''}></label>`;
   let lastGroup = '';
-  p.exercises.forEach((ex, i) => {
+  activeEx(p, d).forEach((ex, i) => {
     if (ui.short && !(ex.group === 'explosive' || ex.group === 'main')) return;
     if (ex.group !== lastGroup) { html += `<div class="group-h">${GROUP_LABEL[ex.group]}</div>`; lastGroup = ex.group; }
     html += exerciseCard(ex, ds, bi.phase, i);
@@ -424,11 +425,37 @@ function renderWorkout(k) {
 
 /* ---------- HIIT menu ---------- */
 const mins = ph => Math.round(ph.reduce((a, x) => a + x.secs, 0) / 60);
+const condOn = d => ymd(d) >= COND_START;
+const condWeek = d => Math.floor(daysBetween(parseYmd(COND_START), d) / 7); // 0 = week of 9 Nov
+const condAB = d => condWeek(d) % 2 === 0 ? 'A' : 'B';
 function hiitPick(d = today()) { // one recommended session each week; deload = Zone 2
   const bi = blockInfo(d); if (bi.phase === 'deload') return 'z2';
+  if (condOn(d)) return COND_ROTATION[condWeek(d) % 2];
   return HIIT_ROTATION[(bi.pre ? 0 : bi.totalWeek - 1) % HIIT_ROTATION.length];
 }
-function rotationAhead(d) { const bi = blockInfo(d), w = bi.pre ? 0 : bi.totalWeek - 1; return [1, 2].map(i => HIIT_ROTATION[(w + i) % HIIT_ROTATION.length]); }
+function rotationAhead(d) {
+  if (condOn(d)) { const w = condWeek(d); return [1, 2].map(i => COND_ROTATION[(w + i) % 2]); }
+  const bi = blockInfo(d), w = bi.pre ? 0 : bi.totalWeek - 1; return [1, 2].map(i => HIIT_ROTATION[(w + i) % HIIT_ROTATION.length]); }
+const activeEx = (p, d = today()) => p.exercises.filter(ex => !ex.from || ymd(d) >= ex.from);
+/* optional weekly easy aerobic: one tick per Brisbane week (Mon start) */
+const easyWeek = ds => weekStartYmd(ds);
+const easyDone = ds => !!load(LS.easy, {})[easyWeek(ds)];
+function setEasy(ds, on) { const all = load(LS.easy, {}), k = easyWeek(ds); if (on) all[k] = Date.now(); else delete all[k]; save(LS.easy, all); }
+function easyCard(ds) {
+  const on = easyDone(ds), o = HIIT.easy, pre = ds < COND_START;
+  return `<div class="card nightcard${on ? ' done' : ''}" id="easycard"><div class="row between"><b class="kicker">This week · optional</b><span class="muted small">30–40 min</span></div>
+    <div class="row between" style="gap:12px;margin-top:6px"><div><div class="cardtitle" style="margin-top:0">${esc(o.name)}</div>
+      <div class="muted small">Brisk walk, ruck (10–15 kg pack), easy ride or row. Conversational pace, any day.${pre ? ' <b>Starts 9 Nov.</b>' : ''}</div></div>
+      <button class="tick nighttick" data-act="easy" aria-pressed="${on}" aria-label="${on ? 'Done this week. Tap to undo' : 'Mark easy aerobic done this week'}">✓</button></div>
+    <div class="muted small" style="margin-top:8px">${on ? 'Done this week.' : 'Not done yet this week. Not compulsory.'} <a href="#/hiit/easy">How to + timer</a></div></div>`;
+}
+function condCard(d) {
+  const on = condOn(d), ab = on ? condAB(d) : 'A';
+  return `<div class="card" id="condcard"><b>Saturday A/B${on ? '' : ' · starts Sat 14 Nov'}</b><div class="muted small" style="margin-top:4px">From 9 Nov, alternating weeks:</div>
+    <ul class="bul small"><li><a href="#/hiit/aeroint"><b>A · Aerobic intervals</b></a>: assault bike 4–6 × 3–4 min hard (RPE 8), equal rest.${on && ab === 'A' ? ' <span class="badge">This week</span>' : ''}</li>
+    <li><a href="#/hiit/rsprint"><b>B · Repeat sprints</b></a>: 6–8 × 100–200 m, 60–90 s rest. Bike sprints OK.${on && ab === 'B' ? ' <span class="badge">This week</span>' : ''}</li></ul>
+    <div class="muted small">Swap any week for: ${COND_SWAPS.map(k => `<a href="#/hiit/${k}">${esc(HIIT[k].name)}</a>`).join(', ')}.</div></div>`;
+}
 const goalChip = g => `<span class="goal ${GOALS[g].cls}">${GOALS[g].label}</span>`;
 function effortCard() {
   return `<details class="card fold"><summary>How hard? (RPE out of 10)</summary><table class="effort">${EFFORT.map(([n, l, d]) => `<tr><td class="rpe">${n}</td><td><b>${l}</b><div class="muted small">${esc(d)}</div></td></tr>`).join('')}</table></details>`;
@@ -439,12 +466,14 @@ function renderHIIT() {
     <div class="card hero" id="hiit-pick"><div class="muted small">This week's pick</div><h2 style="margin:4px 0 4px">${esc(o.name)}</h2>
       <div class="row wrap" style="gap:6px">${goalChip(o.goal)}<span class="chip">${mins(o.phases)} min</span></div>
       <div class="muted small" style="margin-top:6px">${esc(o.desc)}. ${esc(o.equip)}.</div>
-      ${bi.phase === 'deload' ? '<div class="note deload"><b>Deload week:</b> Zone 2 instead of hard intervals.</div>' : HIIT_ALT[pk] ? `<div class="muted small" style="margin-top:6px">Can't do it? Swap for ${esc(HIIT_ALT[pk])}.</div>` : ''}
+      ${bi.phase === 'deload' ? '<div class="note deload"><b>Deload week:</b> Zone 2 instead of hard intervals.</div>' : condOn(d) ? `<div class="muted small" style="margin-top:6px">Week ${condAB(d)} of the A/B rotation. Can't do it? Swap for any old HIIT session below, or a group class with mates (boxing/BJJ).</div>` : HIIT_ALT[pk] ? `<div class="muted small" style="margin-top:6px">Can't do it? Swap for ${esc(HIIT_ALT[pk])}.</div>` : ''}
       <a class="btn" style="margin-top:12px" href="#/hiit/${pk}">Start ${esc(o.name)}</a>
-      <div class="muted small" style="margin-top:10px">Rotation: ${HIIT_ROTATION.map(k => esc(HIIT[k].name)).join(' → ')}, then repeat. Next week: <b>${esc(HIIT[n1].name)}</b>, then ${esc(HIIT[n2].name)}.</div></div>
+      <div class="muted small" style="margin-top:10px">${condOn(d) ? 'Rotation: A Aerobic intervals ↔ B Repeat sprints.' : `Rotation until 9 Nov: ${HIIT_ROTATION.map(k => esc(HIIT[k].name)).join(' → ')}.`} Next week: <b>${esc(HIIT[n1].name)}</b>, then ${esc(HIIT[n2].name)}.</div></div>
+    ${condCard(d)}
+    ${easyCard(ymd(d))}
     <div class="note"><b>Recovery days (Tue, Thu, Sun):</b> optional <a href="#/hiit/z2">Zone 2, 30–45 min</a> on the bike or rower. Easy, talk-test pace. Good for aerobic base and HRV.</div>
     <h2>All sessions</h2>
-    ${Object.keys(HIIT).filter(k => !HIIT[k].hidden).map(k => { const x = HIIT[k]; return `<a class="card hcard${k === pk ? ' pick' : ''}" href="#/hiit/${k}" data-k="${k}">
+    ${Object.keys(HIIT).filter(k => !HIIT[k].hidden && k !== 'easy').map(k => { const x = HIIT[k]; return `<a class="card hcard${k === pk ? ' pick' : ''}" href="#/hiit/${k}" data-k="${k}">
       <div class="row between"><b class="hname">${esc(x.name)}</b>${k === pk ? '<span class="badge">This week</span>' : ''}</div>
       <div class="row wrap" style="gap:6px;margin-top:6px">${goalChip(x.goal)}<span class="chip">${k === 'z2' ? '30–45' : mins(x.phases)} min</span></div>
       <div class="small" style="margin-top:6px">${esc(x.desc)}</div><div class="muted small">${esc(x.equip)}</div></a>`; }).join('')}
@@ -1078,6 +1107,8 @@ document.addEventListener('click', e => {
     startRest(restOf(ex), parts.join(' + '));
   } else if (act === 'nightly') {
     const ds = todayStr(); setNightly(ds, !nightlyDone(ds)); const c = $('#nightly'), tmp = document.createElement('div'); tmp.innerHTML = nightlyCard(ds); if (c) c.replaceWith(tmp.firstElementChild);
+  } else if (act === 'easy') {
+    const ds = todayStr(); setEasy(ds, !easyDone(ds)); document.querySelectorAll('#easycard').forEach(c => { const tmp = document.createElement('div'); tmp.innerHTML = easyCard(ds); c.replaceWith(tmp.firstElementChild); });
   } else if (act === 'swap') {
     const id = b.dataset.ex; settings.swaps[id] = !settings.swaps[id]; if (!settings.swaps[id]) delete settings.swaps[id]; save(LS.settings, settings);
     const y = scrollY; renderWorkout(view().dataset.day); scrollTo(0, y);
