@@ -209,11 +209,7 @@ Object.assign(HIIT, {
   groupclass: { name: 'Group class with mates', goal: 'fight', equip: 'Boxing, BJJ or MMA gym',
     desc: 'Boxing or BJJ class, about 60 min',
     how: ['Any Saturday: swap the A/B session for a boxing or BJJ class with mates.', 'Counts as your conditioning for the week.', 'Go hard in the rounds, easy in the drills.'],
-    phases: [{ label: 'Class', kind: 'hard', secs: 3600 }] },
-  easy: { name: 'Easy aerobic', goal: 'aero', optional: true, equip: 'Brisk walk, ruck (weighted pack, start 10–15 kg), easy ride or row',
-    desc: '30–40 min at conversational pace, any day',
-    how: ['Optional, once a week, any day. Not compulsory.', 'Brisk walk, ruck, easy ride or row. No jogging.', 'Ruck: start with 10–15 kg in the pack, pack high and tight. Add 2–3 kg only when it feels easy.', 'Conversational pace: full sentences the whole way (RPE 3–4).', 'Tick it on Home or here when done.'],
-    phases: [{ label: 'Warm-up (very easy)', kind: 'easy', secs: 300 }, { label: 'Steady, conversational pace', kind: 'rest', secs: 1500 }, { label: 'Cool-down (very easy)', kind: 'easy', secs: 300 }] }
+    phases: [{ label: 'Class', kind: 'hard', secs: 3600 }] }
 });
 const COND_ROTATION = ['aeroint', 'rsprint'];
 const COND_SWAPS = ['n44', 'hill', 'circuit', 'bike', 'wingate', 'emom', 'bag', 'groupclass'];

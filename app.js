@@ -257,7 +257,6 @@ function renderHome() {
     <div class="muted small">${esc(mo.moves.slice(0, 4).map(x => x[0]).join(' · '))} …</div>
     <a class="btn ghost" style="margin-top:10px" href="#/mobility/${mk}">Start mobility</a></div>
   ${nightlyCard(ds)}
-  ${easyCard(ds)}
   <div class="card foodcard"><div class="row between"><b class="kicker">Today's food</b>${dash.hasLog ? `<span class="muted small">${dash.macroBars[1].pct}% protein</span>` : ''}</div>
     <div class="cardtitle">${esc(foodTitle)}</div>
     <div class="muted small">${esc(foodSub)}</div>
@@ -320,7 +319,7 @@ function renderProgram() {
   <div class="card"><h3>HIIT</h3><div class="subt">Saturday · Fighter conditioning</div><ul class="bul small">
    <li>From 9 Nov: <b>A Aerobic intervals ↔ B Repeat sprints</b>, alternating weeks. Until then: ${HIIT_ROTATION.map(k => esc(HIIT[k].name)).join(' → ')}.</li>
    <li>This week: <b>${esc(HIIT[hiitPick()].name)}</b>. 11 sessions to choose from in the HIIT tab.</li>
-   <li>Deload week: Zone 2 instead. Optional easy aerobic (walk, ruck, ride, row) once a week.</li></ul>
+   <li>Deload week: Zone 2 instead. Surf counts as your aerobic base — surf as much as you can.</li></ul>
    <a class="btn" href="#/hiit">Open HIIT</a></div>
   <div class="card"><h3>Mobility</h3><div class="subt">Every day · 15–20 min follow-along</div>
    <ul class="list">${MOB_ORDER.map(k => `<li class="row between"><span>${DAYS[MOBILITY[k].day]}</span><span class="muted">${esc(MOBILITY[k].name)}</span></li>`).join('')}</ul>
@@ -437,18 +436,6 @@ function rotationAhead(d) {
   if (condOn(d)) { const w = condWeek(d); return [1, 2].map(i => COND_ROTATION[(w + i) % 2]); }
   const bi = blockInfo(d), w = bi.pre ? 0 : bi.totalWeek - 1; return [1, 2].map(i => HIIT_ROTATION[(w + i) % HIIT_ROTATION.length]); }
 const activeEx = (p, d = today()) => p.exercises.filter(ex => !ex.from || ymd(d) >= ex.from);
-/* optional weekly easy aerobic: one tick per Brisbane week (Mon start) */
-const easyWeek = ds => weekStartYmd(ds);
-const easyDone = ds => !!load(LS.easy, {})[easyWeek(ds)];
-function setEasy(ds, on) { const all = load(LS.easy, {}), k = easyWeek(ds); if (on) all[k] = Date.now(); else delete all[k]; save(LS.easy, all); }
-function easyCard(ds) {
-  const on = easyDone(ds), o = HIIT.easy, pre = ds < COND_START;
-  return `<div class="card nightcard${on ? ' done' : ''}" id="easycard"><div class="row between"><b class="kicker">This week · optional</b><span class="muted small">30–40 min</span></div>
-    <div class="row between" style="gap:12px;margin-top:6px"><div><div class="cardtitle" style="margin-top:0">${esc(o.name)}</div>
-      <div class="muted small">Brisk walk, ruck (10–15 kg pack), easy ride or row. Conversational pace, any day.${pre ? ' <b>Starts 9 Nov.</b>' : ''}</div></div>
-      <button class="tick nighttick" data-act="easy" aria-pressed="${on}" aria-label="${on ? 'Done this week. Tap to undo' : 'Mark easy aerobic done this week'}">✓</button></div>
-    <div class="muted small" style="margin-top:8px">${on ? 'Done this week.' : 'Not done yet this week. Not compulsory.'} <a href="#/hiit/easy">How to + timer</a></div></div>`;
-}
 function condCard(d) {
   const on = condOn(d), ab = on ? condAB(d) : 'A';
   return `<div class="card" id="condcard"><b>Saturday A/B${on ? '' : ' · starts Sat 14 Nov'}</b><div class="muted small" style="margin-top:4px">From 9 Nov, alternating weeks:</div>
@@ -470,10 +457,10 @@ function renderHIIT() {
       <a class="btn" style="margin-top:12px" href="#/hiit/${pk}">Start ${esc(o.name)}</a>
       <div class="muted small" style="margin-top:10px">${condOn(d) ? 'Rotation: A Aerobic intervals ↔ B Repeat sprints.' : `Rotation until 9 Nov: ${HIIT_ROTATION.map(k => esc(HIIT[k].name)).join(' → ')}.`} Next week: <b>${esc(HIIT[n1].name)}</b>, then ${esc(HIIT[n2].name)}.</div></div>
     ${condCard(d)}
-    ${easyCard(ymd(d))}
+    <div class="note"><b>Aerobic base:</b> Surf counts as your aerobic base — surf as much as you can.</div>
     <div class="note"><b>Recovery days (Tue, Thu, Sun):</b> optional <a href="#/hiit/z2">Zone 2, 30–45 min</a> on the bike or rower. Easy, talk-test pace. Good for aerobic base and HRV.</div>
     <h2>All sessions</h2>
-    ${Object.keys(HIIT).filter(k => !HIIT[k].hidden && k !== 'easy').map(k => { const x = HIIT[k]; return `<a class="card hcard${k === pk ? ' pick' : ''}" href="#/hiit/${k}" data-k="${k}">
+    ${Object.keys(HIIT).filter(k => !HIIT[k].hidden).map(k => { const x = HIIT[k]; return `<a class="card hcard${k === pk ? ' pick' : ''}" href="#/hiit/${k}" data-k="${k}">
       <div class="row between"><b class="hname">${esc(x.name)}</b>${k === pk ? '<span class="badge">This week</span>' : ''}</div>
       <div class="row wrap" style="gap:6px;margin-top:6px">${goalChip(x.goal)}<span class="chip">${k === 'z2' ? '30–45' : mins(x.phases)} min</span></div>
       <div class="small" style="margin-top:6px">${esc(x.desc)}</div><div class="muted small">${esc(x.equip)}</div></a>`; }).join('')}
@@ -1107,8 +1094,6 @@ document.addEventListener('click', e => {
     startRest(restOf(ex), parts.join(' + '));
   } else if (act === 'nightly') {
     const ds = todayStr(); setNightly(ds, !nightlyDone(ds)); const c = $('#nightly'), tmp = document.createElement('div'); tmp.innerHTML = nightlyCard(ds); if (c) c.replaceWith(tmp.firstElementChild);
-  } else if (act === 'easy') {
-    const ds = todayStr(); setEasy(ds, !easyDone(ds)); document.querySelectorAll('#easycard').forEach(c => { const tmp = document.createElement('div'); tmp.innerHTML = easyCard(ds); c.replaceWith(tmp.firstElementChild); });
   } else if (act === 'swap') {
     const id = b.dataset.ex; settings.swaps[id] = !settings.swaps[id]; if (!settings.swaps[id]) delete settings.swaps[id]; save(LS.settings, settings);
     const y = scrollY; renderWorkout(view().dataset.day); scrollTo(0, y);
