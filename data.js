@@ -113,7 +113,7 @@ const PROGRAM = {
     { id: 'C9', group: 'finisher', parts: ['Farmer carry'], sets: 3, min: 30, max: 30, rest: 60, swap: { label: 'Trap bar hold', parts: ['Trap bar hold'], holdTime: true } },
     { id: 'C10', group: 'finisher', superset: true, parts: ['Neck curl', 'Neck extension'], sets: 2, min: 15, max: 15, each: 'each', rest: 45, swap: { label: 'Plate-loaded neck harness', parts: ['Plate-loaded neck harness'] } },
     // Protector conditioning (from 9 Nov 2026): carry a person/gear. Short finisher, nothing else changed.
-    { id: 'C11', group: 'finisher', from: '2026-11-09', parts: ['Sandbag carry'], sets: 3, min: 20, max: 30, rest: 60, note: 'Bear-hug or shoulder carry, 20–30 m. Swap shoulders each set.', swap: { label: 'Farmer carry 3 × 40 m (heavier DBs)', parts: ['Farmer carry'], min: 40, max: 40 } }
+    { id: 'C11', group: 'finisher', from: '2026-11-09', parts: ['Sandbag carry'], sets: 3, min: 20, max: 30, rest: 60, note: 'Bear-hug or shoulder carry, 20–30 m. Swap shoulders each set.', swap: { label: 'No sandbag? Suitcase carry (one heavy DB), 30 m each side', parts: ['Suitcase carry'], min: 30, max: 30 } }
   ]}
 };
 
