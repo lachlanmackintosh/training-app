@@ -698,7 +698,7 @@ function optMacroLine(o) {
   return `${comma(Math.round(n.kcal))} kcal · ${Math.round(n.protein_g)} g protein`;
 }
 function optRow(o, on, multi) {
-  return `<div class="optrow${on ? ' on' : ''}"><button type="button" class="optmain" data-act="opt-open" data-opt="${esc(o.id)}"><b>${esc(o.name)}</b><span class="muted small">${o.info && OPTS[o.id] && OPTS[o.id].meal === 'supps' ? esc(o.info.dose) : esc(optMacroLine(o))}${o.tags && (o.tags.indexOf('night') === 0 || o.tags === 'Slow cooker') ? ' · ' + esc(o.tags) : ''}</span>${o.info ? `<span class="optinfo">${esc(o.info.timing)}</span>` : ''}</button>
+  return `<div class="optrow${on ? ' on' : ''}"><button type="button" class="optmain" data-act="opt-open" data-opt="${esc(o.id)}"><b>${esc(o.name)}</b>${Array.isArray(o.season) ? (inSeason(o, todayStr()) ? '<span class="stag in">\u2713 In season</span>' : (o.frozenOk ? '<span class="stag frozen">\u2715 Frozen, any month</span>' : '<span class="stag out">\u2715 Not in season</span>')) : ''}<span class="muted small">${o.info && OPTS[o.id] && OPTS[o.id].meal === 'supps' ? esc(o.info.dose) : esc(optMacroLine(o))}${o.tags && (o.tags.indexOf('night') === 0 || o.tags === 'Slow cooker') ? ' · ' + esc(o.tags) : ''}</span>${o.info ? `<span class="optinfo">${esc(o.info.timing)}</span>` : ''}</button>
     <button type="button" class="optpick${on ? ' on' : ''}" data-act="${on ? 'opt-remove' : 'opt-select'}" data-opt="${esc(o.id)}" aria-label="${on ? 'Remove' : 'Select'} ${esc(o.name)}">${on ? '✓' : (multi ? '+' : '')}</button></div>`;
 }
 function slotCard(day, sl) {

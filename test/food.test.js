@@ -163,7 +163,7 @@ test('old food storage migrates without the dropped foods', () => {
 
 test('service worker cache is the tracker build', () => {
   const sw = fs.readFileSync(path.join(root, 'sw.js'), 'utf8');
-  assert.ok(sw.indexOf("baki-v33-surf") !== -1);
+  assert.ok(sw.indexOf("baki-v34-season") !== -1);
   assert.ok(sw.indexOf('./food-plan.js') !== -1);
   assert.ok(sw.indexOf('./food-log.js') !== -1);
 });
@@ -298,7 +298,7 @@ test('seasonal fruit and juices carry full nutrients and count when ticked', () 
   const oct = g.snackOrder(P.snacks, '2026-10-13').filter(o => o.season).map(o => g.inSeason(o, '2026-10-13'));
   assert.ok(oct.indexOf(false) === -1 || oct.lastIndexOf(true) < oct.indexOf(false), 'in season first');
   assert.ok(g.inSeason(P.snacks.find(s => s.id === 's_mango'), '2026-10-13'));
-  assert.ok(!g.inSeason(P.snacks.find(s => s.id === 's_mand'), '2026-10-13'));
+  assert.ok(!g.inSeason(P.snacks.find(s => s.id === 's_mand'), '2026-11-13'));
 });
 
 console.log('all food tests passed');

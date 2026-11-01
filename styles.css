@@ -593,3 +593,5 @@ body.sheet-on{overflow:hidden}
 /* nightly foam roll (Coach Kyle) */
 .nighttick{flex-shrink:0}
 .nightcard.done .nighttick{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+
+.stag{display:block;font-size:.75em;font-weight:600;margin:1px 0}.stag.in{color:#3a9a6a}.stag.out{color:#8a8a8a}.stag.frozen{color:#4a7fb5}
