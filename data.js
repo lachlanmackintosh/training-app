@@ -71,13 +71,22 @@ const MOV = {
   'Farmer carry': { img: 'Farmers_Walk', match: 'exact', src: 'Farmer\u2019s Walk', cue: 'Heavy DBs, stand tall, shoulders down, short quick steps. Don\u2019t let the weights swing.', lower: true, metric: 'm' },
   'Sandbag carry': { img: 'Farmers_Walk', match: 'closest', src: 'Loaded carry (sandbag)', cue: 'Bear-hug the sandbag tight to your chest, or load it onto one shoulder (swap shoulders each set). Brace hard, stand tall, short quick steps. Like carrying a person out.', lower: true, metric: 'm' },
   'Suitcase carry': { img: 'Farmers_Walk', match: 'closest', src: 'Farmer\u2019s Walk (one hand)', cue: 'One heavy DB in one hand. Stand dead straight, don\u2019t lean away from it. Walk, then switch hands.', lower: true, metric: 'm' },
-  'Trap bar hold': { img: 'Trap_Bar_Deadlift', match: 'closest', src: 'Trap Bar Deadlift (hold at the top)', cue: 'Deadlift the trap bar, then hold it at the top: stand tall, shoulders down, grip hard.', metric: 'sec' }
+  'Trap bar hold': { img: 'Trap_Bar_Deadlift', match: 'closest', src: 'Trap Bar Deadlift (hold at the top)', cue: 'Deadlift the trap bar, then hold it at the top: stand tall, shoulders down, grip hard.', metric: 'sec' },
+
+  // ---------- Surf power (training days, before heavy lifts) ----------
+  'Burpee to surf stance': { img: 'Plyo_Push-up', match: 'closest', src: 'Plyo Push-up (land in surf stance)', cue: 'From standing: hands down, jump to plank, chest near the floor, jump the feet in and land in your surf stance (one foot forward). Soft landing, no knee touch. Alternate lead foot each rep.', bw: true },
+  'Push-up into knee drive': { img: 'Plyo_Push-up', match: 'closest', src: 'Push-up + knee drive', cue: 'Push-up, then drive one knee to your chest at the top. Alternate sides. Hips stay level, no bouncing.', bw: true },
+  'Lateral bound (stick)': { img: 'Lateral_Bound', match: 'exact', src: 'Lateral Bound (stick the landing)', cue: 'Bound sideways onto one leg and stick a soft, quiet landing for a beat before you go back. Hold a stick or broom overhead if you have one for balance.', lower: true, bw: true },
 };
 
 /* Exercises per day. sets/min/max = plan targets. each = 'each' text. rest in seconds.
    main = bold main lift (heavy week applies). group: explosive | main | muscle | finisher */
 const PROGRAM = {
   A: { key: 'A', day: 'Monday', title: 'Session 1', focus: 'Power + Back', exercises: [
+    // Surf power: fresh, before heavy lifts. 3 gym days = max 3×/week.
+    { id: 'As1', group: 'surf', parts: ['Burpee to surf stance'], sets: 3, min: 8, max: 8, rest: 60, note: 'Max 2–3×/week. Done fresh before heavy lifts.', swap: { label: 'Explosive push-up 3 × 8', parts: ['Explosive push-up'] } },
+    { id: 'As2', group: 'surf', parts: ['Push-up into knee drive'], sets: 3, min: 8, max: 8, each: 'each side', rest: 60, swap: { label: 'Explosive push-up 3 × 8', parts: ['Explosive push-up'] } },
+    { id: 'As3', group: 'surf', parts: ['Lateral bound (stick)'], sets: 3, min: 8, max: 8, each: 'each side', rest: 60, swap: { label: 'Lateral bound 3 × 8 each side', parts: ['Lateral bound'] } },
     { id: 'A1', group: 'explosive', parts: ['Med-ball slam'], sets: 3, min: 5, max: 5, rest: 60, swap: { label: 'Kettlebell swing 3 \u00d7 8', parts: ['Kettlebell swing'], sets: 3, min: 8, max: 8 } },
     { id: 'A2', group: 'explosive', parts: ['Broad jump'], sets: 3, min: 3, max: 3, rest: 60, swap: { label: 'Box jump 3 \u00d7 3', parts: ['Box jump'] } },
     { id: 'A3', group: 'main', main: true, parts: ['Trap bar deadlift'], sets: 3, min: 6, max: 8, rest: 120, swap: { label: 'Conventional deadlift', parts: ['Conventional deadlift'] } },
@@ -89,6 +98,10 @@ const PROGRAM = {
     { id: 'A9', group: 'finisher', parts: ['Dead hang'], sets: 1, maxTime: true, rest: 0, swap: { label: 'Farmer hold', parts: ['Farmer hold'] } }
   ]},
   B: { key: 'B', day: 'Wednesday', title: 'Session 2', focus: 'Legs + Chest', exercises: [
+    // Surf power: fresh, before heavy lifts. 3 gym days = max 3×/week.
+    { id: 'Bs1', group: 'surf', parts: ['Burpee to surf stance'], sets: 3, min: 8, max: 8, rest: 60, note: 'Max 2–3×/week. Done fresh before heavy lifts.', swap: { label: 'Explosive push-up 3 × 8', parts: ['Explosive push-up'] } },
+    { id: 'Bs2', group: 'surf', parts: ['Push-up into knee drive'], sets: 3, min: 8, max: 8, each: 'each side', rest: 60, swap: { label: 'Explosive push-up 3 × 8', parts: ['Explosive push-up'] } },
+    { id: 'Bs3', group: 'surf', parts: ['Lateral bound (stick)'], sets: 3, min: 8, max: 8, each: 'each side', rest: 60, swap: { label: 'Lateral bound 3 × 8 each side', parts: ['Lateral bound'] } },
     { id: 'B1', group: 'explosive', parts: ['Box jump'], sets: 3, min: 3, max: 3, rest: 60, swap: { label: 'Squat jump', parts: ['Squat jump'] } },
     { id: 'B2', group: 'explosive', parts: ['Med-ball chest pass'], sets: 3, min: 5, max: 5, rest: 60, swap: { label: 'Explosive push-up', parts: ['Explosive push-up'] } },
     { id: 'B3', group: 'main', main: true, parts: ['Back squat'], sets: 3, min: 6, max: 8, rest: 120, swap: { label: 'Leg press or hack squat', parts: ['Leg press or hack squat'] } },
@@ -102,6 +115,9 @@ const PROGRAM = {
     { id: 'B10', group: 'posture', parts: ['Prone cobra hold'], sets: 1, maxTime: true, timeText: '3+ min hold', rest: 0, note: 'Can\u2019t hold 3 min yet? Swap to the build-up: 3 \u00d7 60 s.', swap: { label: 'Build-up: 3 \u00d7 60 s holds', parts: ['Prone cobra hold'], sets: 3, holdTime: true, timeText: '60 s hold', rest: 60 } }
   ]},
   C: { key: 'C', day: 'Friday', title: 'Session 3', focus: 'Shoulders + Arms', exercises: [
+    // Surf power: fresh, before heavy lifts. Lateral bound already later as C2 — don't duplicate.
+    { id: 'Cs1', group: 'surf', parts: ['Burpee to surf stance'], sets: 3, min: 8, max: 8, rest: 60, note: 'Max 2–3×/week. Done fresh before heavy lifts. Lateral bounds are already in Explosive today.', swap: { label: 'Explosive push-up 3 × 8', parts: ['Explosive push-up'] } },
+    { id: 'Cs2', group: 'surf', parts: ['Push-up into knee drive'], sets: 3, min: 8, max: 8, each: 'each side', rest: 60, swap: { label: 'Explosive push-up 3 × 8', parts: ['Explosive push-up'] } },
     { id: 'C1', group: 'explosive', parts: ['Med-ball rotational throw'], sets: 3, min: 5, max: 5, each: 'each side', rest: 60, swap: { label: 'Cable woodchop (fast)', parts: ['Cable woodchop (fast)'] } },
     { id: 'C2', group: 'explosive', parts: ['Lateral bound'], sets: 3, min: 3, max: 3, each: 'each side', rest: 60, swap: { label: 'Skater hop', parts: ['Skater hop'] } },
     { id: 'C3', group: 'main', main: true, parts: ['Military press'], sets: 3, min: 6, max: 8, rest: 120, swap: { label: 'Seated DB shoulder press', parts: ['Seated DB shoulder press'] } },
@@ -227,7 +243,7 @@ const NUTRITION = { kcal: 2750, protein: 178, carbs: 255, fat: 120 };
 
 
 
-const GROUP_LABEL = { explosive: 'Explosive: fast and fresh', main: 'Main lifts', muscle: 'Muscle work', finisher: 'Finisher: neck and grip', posture: 'Finisher: posture' };
+const GROUP_LABEL = { surf: 'Surf power: fresh, before heavy lifts', explosive: 'Explosive: fast and fresh', main: 'Main lifts', muscle: 'Muscle work', finisher: 'Finisher: neck and grip', posture: 'Finisher: posture' };
 
 /* Demo videos (YouTube, embedded via youtube-nocookie on tap). Every ID was checked on 1 Oct 2026:
    oEmbed returned 200 with the title/channel below, and the watch page reported playable + embeddable. */
@@ -291,7 +307,10 @@ const VIDEO = {
   "Reverse curl": { id: "nRgxYX2Ve9w", title: "How to Do a Reverse Curl | Arm Workout", ch: "Howcast", secs: 108 },
   "Wrist roller": { id: "-lOFG0U_rlY", title: "Wrist Roller - Forearm Exercise - Bodybuilding.com", ch: "Bodybuilding.com", secs: 40 },
   "Farmer carry": { id: "NH7Xv-7NQNQ", title: "How To Perform Farmer Walks Exercise Tutorial", ch: "Buff Dudes Workouts", secs: 90 },
-  "Trap bar hold": { id: "df-MeZsxCAM", title: "Trap Bar Farmers Carry", ch: "John Rusin", secs: 23, note: "Trap bar carry: same pick-up and grip, just stand still and hold" }
+  "Trap bar hold": { id: "df-MeZsxCAM", title: "Trap Bar Farmers Carry", ch: "John Rusin", secs: 23, note: "Trap bar carry: same pick-up and grip, just stand still and hold" },
+  "Burpee to surf stance": { id: "y50hpCDU-qA", title: "Surf Burpees High", ch: "Conatus Surf Club", secs: 30 },
+  "Push-up into knee drive": { id: "ElzJmvP68u4", title: "Push Up With Knee Drive", ch: "Muscle & Strength", secs: 45 },
+  "Lateral bound (stick)": { id: "4nTDP0G3nhc", title: "Lateral Bound with Stick", ch: "ken whittier", secs: 40 },
 };
 
 const APP_HEADING = 'Baki Program';
@@ -304,7 +323,7 @@ const TEMPO_INFO = {
   brace: { label: 'Brace + hold', cls: 't-hold', cue: 'Brace and stand tall.' }
 };
 const TEMPO_GROUPS = {
-  explosive: ['Med-ball slam', 'Kettlebell swing', 'Broad jump', 'Box jump', 'Squat jump', 'Med-ball chest pass', 'Explosive push-up', 'Med-ball rotational throw', 'Cable woodchop (fast)', 'Lateral bound', 'Skater hop'],
+  explosive: ['Med-ball slam', 'Kettlebell swing', 'Broad jump', 'Box jump', 'Squat jump', 'Med-ball chest pass', 'Explosive push-up', 'Med-ball rotational throw', 'Cable woodchop (fast)', 'Lateral bound', 'Skater hop', 'Burpee to surf stance', 'Push-up into knee drive', 'Lateral bound (stick)'],
   power: ['Trap bar deadlift', 'Conventional deadlift', 'Back squat', 'Leg press or hack squat', 'Incline barbell bench', 'Flat DB bench', 'Military press', 'Seated DB shoulder press', 'Romanian deadlift', 'DB RDL or lying leg curl', 'Weighted pull-up', 'Wide-grip lat pulldown', 'Barbell row', 'Chest-supported DB row'],
   controlled: ['Incline DB press', 'Incline barbell or machine press', 'DB lateral raise', 'Cable lateral raise', 'Hammer curl', 'Skull-crusher', 'Rope hammer curl', 'Overhead DB extension', 'Neck curl', 'Neck extension', 'Plate-loaded neck harness', 'Walking lunge', 'Bulgarian split squat', 'Dips', 'Close-grip bench', 'Standing calf raise', 'Seated calf raise', 'Hanging knee raise', 'Cable crunch', 'Close-grip cable row', 'Seated machine row', 'Rear delt fly', 'Shrug', 'Face pull', 'DB shrug', 'Incline DB curl', 'Rope pushdown', 'EZ bar curl', 'Overhead cable extension', 'Reverse curl', 'Wrist roller'],
   brace: ['Dead hang', 'Farmer hold', 'Farmer carry', 'Sandbag carry', 'Suitcase carry', 'Trap bar hold', 'Prone cobra hold']
@@ -359,7 +378,9 @@ const MOB = {
   'Burpee': { cue: 'Squat, hands down, jump the feet back to a plank, chest to the floor, jump the feet in, jump up. Steady rhythm.' },
   'Sprawl': { cue: 'From fight stance, drop the hands and shoot the legs back, hips down hard. Bounce back up to stance fast.' },
   'Rower technique': { img: 'Rowing_Stationary', match: 'exact', cue: 'Legs, then body, then arms. On the way back: arms, body, then legs. Drive with the legs. Damper 4–6.' },
-  'Air bike technique': { cue: 'Sit tall, push and pull the handles while you pedal. For sprints, go all-out from the first second.' }
+  'Air bike technique': { cue: 'Sit tall, push and pull the handles while you pedal. For sprints, go all-out from the first second.' },
+  'Cobra to downward dog': { cue: 'Lie face down, press into a gentle cobra (chest up, hips down), then push the hips up and back into downward dog. Slow and smooth, 10 reps.' },
+  'Slow pop-up': { cue: 'Lie flat, hands under your chest (not out by the shoulders). In one move, pop to your surf stance. Land quietly, no knee touching down. Slow and perfect — film one if you can.' },
 };
 /* 7 follow-along sessions, 15–20 min. [move, seconds, 'sides'] — sided moves switch at half time. */
 const MOBILITY = {
@@ -369,10 +390,13 @@ const MOBILITY = {
   thu: { day: 4, name: 'Neck + posture', moves: [['Neck CARs', 60], ['Chin tuck', 90], ['Supine chin-tuck head lift', 90], ['Levator scapulae stretch', 120, 'sides'], ['Foam roller T-spine extension', 90], ['Wall angel', 90], ['Doorway pec stretch', 120, 'sides'], ['Prone Y-T-W', 90], ['Band pull-apart', 60], ['Crocodile breathing', 60], ['Semi-supine rest', 300]] },
   fri: { day: 5, name: 'Full-body flow', moves: [['Cat-cow', 60], ['Inchworm', 60], ["World's greatest stretch", 120, 'sides'], ['Downward dog', 60], ['90/90 hip switch', 90], ['Thread the needle', 90, 'sides'], ['Deep squat hold', 90], ['Shoulder CARs', 90, 'sides'], ['Hip CARs', 90, 'sides'], ['Chin tuck', 60], ['Wall angel', 60], ['Semi-supine rest', 120]] },
   sat: { day: 6, name: 'Ankles + squat depth', moves: [['Ankle CARs', 90, 'sides'], ['Knee-to-wall ankle mobilisation', 120, 'sides'], ['Wall calf stretch', 120, 'sides'], ['Tibialis raise', 60], ['Goblet squat pry', 120], ['Deep squat hold', 120], ['Frog stretch', 90], ['Couch stretch', 120, 'sides'], ['Chin tuck', 60], ['Foam roller T-spine extension', 60], ['Semi-supine rest', 120]] },
-  sun: { day: 0, name: 'Recovery flow + semi-supine', moves: [['Crocodile breathing', 90], ['Cat-cow', 60], ["Child's pose", 90], ['Sphinx pose', 60], ['Supine twist', 120, 'sides'], ['Happy baby', 60], ['Pigeon stretch', 120, 'sides'], ['Strap hamstring stretch', 120, 'sides'], ['Supine chin-tuck head lift', 60], ['Semi-supine rest', 300]] }
+  sun: { day: 0, name: 'Recovery flow + semi-supine', moves: [['Crocodile breathing', 90], ['Cat-cow', 60], ["Child's pose", 90], ['Sphinx pose', 60], ['Supine twist', 120, 'sides'], ['Happy baby', 60], ['Pigeon stretch', 120, 'sides'], ['Strap hamstring stretch', 120, 'sides'], ['Supine chin-tuck head lift', 60], ['Semi-supine rest', 300]] },
+  surf: { day: null, name: 'Surf mobility', moves: [["World's greatest stretch", 60, 'sides'], ['Open book', 120, 'sides'], ['Cobra to downward dog', 90], ['90/90 hip switch', 90, 'sides'], ['Deep squat hold', 60], ['Shoulder CARs', 60, 'sides'], ['Slow pop-up', 90]] }
 };
 /* Coach Kyle (Oct 2026): every night before bed, tick it off on Home. Resets each Brisbane day. */
 const NIGHTLY = { id: 'foamroll', move: 'Long foam roller chest opener', title: 'Foam roll before bed', mins: 5, sub: '5+ min lying lengthways on a long foam roller. Chest opens, spine decompresses. Great for winding down.' };
+/* Daily ~10 min surf block: mobility + slow pop-ups. Not tied to a weekday — do every day. */
+const SURF_MOB_KEY = 'surf';
 const MOB_ORDER = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
 /* Alexander Technique-style posture cues: short, rotate through the session. */
 const AT_CUES = ['Let your neck be free.', 'Let your head go forward and up, not pulled back or down.', 'Let your back lengthen and widen.', 'Let your knees go forward and away.', 'Notice tension, then let it go. Don\u2019t force a \u201cgood posture\u201d.', 'Breathe out fully. Let the in-breath happen on its own.'];
@@ -424,5 +448,7 @@ Object.assign(VIDEO, {
   "Burpee": { id: "G2hv_NYhM-A", title: "How To Do Burpees With Proper Form", ch: "BuiltLean®", secs: 69 },
   "Sprawl": { id: "YyA0JAnK5l8", title: "Sprawl Solo Drill - Wrestling for MMA", ch: "Flow Athletics", secs: 129 },
   "Rower technique": { id: "4zWu1yuJ0_g", title: "Correct Rowing Machine Technique, Improve Your Rowing  | Concept2", ch: "concept2usa", secs: 113 },
-  "Air bike technique": { id: "KC-ZSfOmXgE", title: "HOW TO USE THE AIRBIKE", ch: "Nutrition Warehouse", secs: 55 }
+  "Air bike technique": { id: "KC-ZSfOmXgE", title: "HOW TO USE THE AIRBIKE", ch: "Nutrition Warehouse", secs: 55 },
+  "Cobra to downward dog": { id: "Pro1dTNYcZo", title: "Cobra to downward dog", ch: "Health by Science", secs: 60 },
+  "Slow pop-up": { id: "k-AkoZP8MKw", title: "How to Practice you Take Offs at home | How to Surf | The Standard Pop Up and more.", ch: "Barefoot Surf", secs: 420 },
 });

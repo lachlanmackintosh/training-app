@@ -256,6 +256,10 @@ function renderHome() {
     <div class="cardtitle">${esc(mo.name)}</div>
     <div class="muted small">${esc(mo.moves.slice(0, 4).map(x => x[0]).join(' · '))} …</div>
     <a class="btn ghost" style="margin-top:10px" href="#/mobility/${mk}">Start mobility</a></div>
+  <div class="card mobcard"><div class="row between"><b class="kicker">Daily · Surf</b><span class="muted small">${mobMins(SURF_MOB_KEY)} min</span></div>
+    <div class="cardtitle">${esc(MOBILITY[SURF_MOB_KEY].name)}</div>
+    <div class="muted small">${esc(MOBILITY[SURF_MOB_KEY].moves.map(x => x[0]).join(' · '))}</div>
+    <a class="btn ghost" style="margin-top:10px" href="#/mobility/${SURF_MOB_KEY}">Start surf mobility</a></div>
   ${nightlyCard(ds)}
   <div class="card foodcard"><div class="row between"><b class="kicker">Today's food</b>${dash.hasLog ? `<span class="muted small">${dash.macroBars[1].pct}% protein</span>` : ''}</div>
     <div class="cardtitle">${esc(foodTitle)}</div>
@@ -312,7 +316,7 @@ function renderProgram() {
   <div class="card"><b>The week</b><ul class="list">${WEEK_TABLE.map(([d, s]) => `<li class="row between"><span>${d}</span><span class="muted">${esc(s)}</span></li>`).join('')}</ul>
    <div class="muted small">All three gym days are full body. The name just shows the focus.</div></div>
   <div class="card"><b>Every gym session (about 60 min)</b><ol class="bul small">
-   <li>Warm-up: 5 min easy bike, then 2 light sets of your first main lift</li><li>Explosive: 2 moves, done fast and fresh</li>
+   <li>Warm-up: 5 min easy bike, then 2 light sets of your first main lift</li><li>Surf power: burpee to stance, knee-drive push-up, lateral bound (stick) — fresh, before heavy lifts</li><li>Explosive: 2 moves, done fast and fresh</li>
    <li>Main lifts: 2 heavy exercises</li><li>Muscle work: accessories and supersets</li><li>Finisher: neck and grip</li></ol>
    <div class="muted small">Superset = do the two exercises back to back, then rest.</div></div>
   ${['A', 'B', 'C'].map(k => dayCard(PROGRAM[k])).join('')}
@@ -321,7 +325,7 @@ function renderProgram() {
    <li>This week: <b>${esc(HIIT[hiitPick()].name)}</b>. 11 sessions to choose from in the HIIT tab.</li>
    <li>Deload week: Zone 2 instead. Surf counts as your aerobic base — surf as much as you can.</li></ul>
    <a class="btn" href="#/hiit">Open HIIT</a></div>
-  <div class="card"><h3>Mobility</h3><div class="subt">Every day · 15–20 min follow-along</div>
+  <div class="card"><h3>Mobility</h3><div class="subt">Every day · themed 15–20 min + daily Surf (~10 min)</div>
    <ul class="list">${MOB_ORDER.map(k => `<li class="row between"><span>${DAYS[MOBILITY[k].day]}</span><span class="muted">${esc(MOBILITY[k].name)}</span></li>`).join('')}</ul>
    <a class="btn ghost" href="#/mobility">Open mobility</a></div>`;
 }
@@ -409,10 +413,10 @@ function renderWorkout(k) {
   let html = `<div class="topbar"><a class="back" href="#/home" aria-label="Back">‹</a><div style="flex:1"><div class="muted small">${esc(weekLine(bi))}</div><h1 style="font-size:22px;margin:0">${esc(p.title)}</h1><div class="subt">${esc(p.day)} · ${esc(p.focus)}</div></div>${phaseChip(bi)}</div>
     <div class="note ${ph.cls}"><b>${ph.name}:</b> ${esc(ph.short)}</div>
     <details class="card fold"><summary>Warm-up</summary><div>5 min easy bike, then 2 light sets of your first main lift.</div></details>
-    <label class="toggle card" style="padding:10px 16px"><span><b>Short on time?</b><br><span class="muted small">Explosive moves and the 2 main lifts only</span></span><input type="checkbox" data-act="short" ${ui.short ? 'checked' : ''}></label>`;
+    <label class="toggle card" style="padding:10px 16px"><span><b>Short on time?</b><br><span class="muted small">Surf power, explosive moves and the 2 main lifts only</span></span><input type="checkbox" data-act="short" ${ui.short ? 'checked' : ''}></label>`;
   let lastGroup = '';
   activeEx(p, d).forEach((ex, i) => {
-    if (ui.short && !(ex.group === 'explosive' || ex.group === 'main')) return;
+    if (ui.short && !(ex.group === 'surf' || ex.group === 'explosive' || ex.group === 'main')) return;
     if (ex.group !== lastGroup) { html += `<div class="group-h">${GROUP_LABEL[ex.group]}</div>`; lastGroup = ex.group; }
     html += exerciseCard(ex, ds, bi.phase, i);
   });
@@ -488,13 +492,17 @@ function renderHIITSession(key) {
 /* ---------- mobility ---------- */
 const mobKeyFor = d => MOB_ORDER.find(k => MOBILITY[k].day === d.getDay());
 const mobMins = k => Math.round(MOBILITY[k].moves.reduce((a, x) => a + x[1], 0) / 60);
+const mobDayLabel = mo => mo.day == null ? 'Every day' : DAYS[mo.day];
 const moveTime = ([, s, sides]) => `${s >= 60 ? (s % 60 ? `${Math.floor(s / 60)} min ${s % 60} s` : `${s / 60} min`) : `${s} s`}${sides ? ' · both sides' : ''}`;
 function renderMobility() {
   const d = today(), tk = mobKeyFor(d), mo = MOBILITY[tk];
   view().innerHTML = `<h1>Mobility</h1><div class="subt">Every day · 15–20 min · follow along</div>
-    <div class="card hero"><div class="muted small">Today · ${DAYS[mo.day]}</div><h2 style="margin:4px 0 2px">${esc(mo.name)}</h2>
+    <div class="card hero"><div class="muted small">Daily · Surf · ~${mobMins(SURF_MOB_KEY)} min</div><h2 style="margin:4px 0 2px">${esc(MOBILITY[SURF_MOB_KEY].name)}</h2>
+      <div class="muted small">${MOBILITY[SURF_MOB_KEY].moves.length} moves · flexibility, ROM, slow pop-ups</div>
+      <a class="btn" style="margin-top:12px" href="#/mobility/${SURF_MOB_KEY}">Start ${esc(MOBILITY[SURF_MOB_KEY].name)}</a></div>
+    <div class="card"><div class="muted small">Today · ${DAYS[mo.day]}</div><h2 style="margin:4px 0 2px;font-size:20px">${esc(mo.name)}</h2>
       <div class="muted small">${mobMins(tk)} min · ${mo.moves.length} moves · neck-hump drills included</div>
-      <a class="btn" style="margin-top:12px" href="#/mobility/${tk}">Start ${esc(mo.name)}</a></div>
+      <a class="btn ghost" style="margin-top:12px" href="#/mobility/${tk}">Start ${esc(mo.name)}</a></div>
     <h2>Every night</h2>
     <div class="card"><div class="row between"><b>${esc(NIGHTLY.title)}</b><span class="muted small">${nightlyDone(todayStr()) ? '✓ Done tonight' : NIGHTLY.mins + '+ min'}</span></div>
       <div class="muted small" style="margin:4px 0 8px">Coach Kyle: “spend 5+ minutes each night letting your chest open and spine decompress.” Tick it off on Home.</div>
@@ -507,12 +515,13 @@ function renderMobility() {
       <li>Breathe slowly. Ease into each stretch: mild tension, never pain.</li>
       <li>Gym days: do it after training or in the evening, not right before heavy or explosive work.</li>
       <li>Through the day: screen at eye level, and a few chin tucks every hour.</li>
-      <li>Progress slowly. Range comes from doing a little most days.</li></ul></details>`;
+      <li>Progress slowly. Range comes from doing a little most days.</li>
+      <li>Surf mobility: do the short daily Surf session most days. Slow pop-ups at the end. Save explosive surf power for gym days.</li></ul></details>`;
 }
 function renderMobSession(key) {
   const mo = MOBILITY[key]; if (!mo) return go('#/mobility');
   if (!pSet('mob', key)) { toast('Pause or reset the running timer first'); return go(pHash()); }
-  view().innerHTML = `<div class="topbar"><a class="back" href="#/mobility" aria-label="Back">‹</a><div style="flex:1"><h1 style="font-size:22px;margin:0">${esc(DAYS[mo.day])} · ${esc(mo.name)}</h1><div class="subt">${mobMins(key)} min · ${mo.moves.length} moves · follow along</div></div></div>
+  view().innerHTML = `<div class="topbar"><a class="back" href="#/mobility" aria-label="Back">‹</a><div style="flex:1"><h1 style="font-size:22px;margin:0">${esc(mobDayLabel(mo))} · ${esc(mo.name)}</h1><div class="subt">${mobMins(key)} min · ${mo.moves.length} moves · follow along</div></div></div>
     <div class="hiit-clock mobclock" id="hiit-clock"><div class="hiit-phase" id="hiit-phase">Ready</div><div class="hiit-time" id="hiit-time">0:00</div><div class="hiit-sub" id="hiit-sub"></div></div>
     <div class="grid3"><button class="btn ghost" data-act="mob-prev" aria-label="Previous move">‹ Back</button><button class="btn" data-act="hiit-start" id="hiit-start">Start</button><button class="btn ghost" data-act="hiit-skip" aria-label="Next move">Next ›</button></div>
     <div class="card mobnow" id="mob-now"></div>
