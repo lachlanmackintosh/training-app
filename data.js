@@ -73,7 +73,7 @@ const MOV = {
   'Suitcase carry': { img: 'Farmers_Walk', match: 'closest', src: 'Farmer\u2019s Walk (one hand)', cue: 'One heavy DB in one hand. Stand dead straight, don\u2019t lean away from it. Walk, then switch hands.', lower: true, metric: 'm' },
   'Trap bar hold': { img: 'Trap_Bar_Deadlift', match: 'closest', src: 'Trap Bar Deadlift (hold at the top)', cue: 'Deadlift the trap bar, then hold it at the top: stand tall, shoulders down, grip hard.', metric: 'sec' },
 
-  // ---------- Surf power (training days, before heavy lifts) ----------
+  // ---------- Surf power (at home Mon/Wed/Fri — not the gym session) ----------
   'Burpee to surf stance': { img: 'Plyo_Push-up', match: 'closest', src: 'Plyo Push-up (land in surf stance)', cue: 'From standing: hands down, jump to plank, chest near the floor, jump the feet in and land in your surf stance (one foot forward). Soft landing, no knee touch. Alternate lead foot each rep.', bw: true },
   'Push-up into knee drive': { img: 'Plyo_Push-up', match: 'closest', src: 'Push-up + knee drive', cue: 'Push-up, then drive one knee to your chest at the top. Alternate sides. Hips stay level, no bouncing.', bw: true },
   'Lateral bound (stick)': { img: 'Lateral_Bound', match: 'exact', src: 'Lateral Bound (stick the landing)', cue: 'Bound sideways onto one leg and stick a soft, quiet landing for a beat before you go back. Hold a stick or broom overhead if you have one for balance.', lower: true, bw: true },
@@ -83,10 +83,6 @@ const MOV = {
    main = bold main lift (heavy week applies). group: explosive | main | muscle | finisher */
 const PROGRAM = {
   A: { key: 'A', day: 'Monday', title: 'Session 1', focus: 'Power + Back', exercises: [
-    // Surf power: fresh, before heavy lifts. 3 gym days = max 3×/week.
-    { id: 'As1', group: 'surf', parts: ['Burpee to surf stance'], sets: 3, min: 8, max: 8, rest: 60, note: 'Max 2–3×/week. Done fresh before heavy lifts.', swap: { label: 'Explosive push-up 3 × 8', parts: ['Explosive push-up'] } },
-    { id: 'As2', group: 'surf', parts: ['Push-up into knee drive'], sets: 3, min: 8, max: 8, each: 'each side', rest: 60, swap: { label: 'Explosive push-up 3 × 8', parts: ['Explosive push-up'] } },
-    { id: 'As3', group: 'surf', parts: ['Lateral bound (stick)'], sets: 3, min: 8, max: 8, each: 'each side', rest: 60, swap: { label: 'Lateral bound 3 × 8 each side', parts: ['Lateral bound'] } },
     { id: 'A1', group: 'explosive', parts: ['Med-ball slam'], sets: 3, min: 5, max: 5, rest: 60, swap: { label: 'Kettlebell swing 3 \u00d7 8', parts: ['Kettlebell swing'], sets: 3, min: 8, max: 8 } },
     { id: 'A2', group: 'explosive', parts: ['Broad jump'], sets: 3, min: 3, max: 3, rest: 60, swap: { label: 'Box jump 3 \u00d7 3', parts: ['Box jump'] } },
     { id: 'A3', group: 'main', main: true, parts: ['Trap bar deadlift'], sets: 3, min: 6, max: 8, rest: 120, swap: { label: 'Conventional deadlift', parts: ['Conventional deadlift'] } },
@@ -98,10 +94,6 @@ const PROGRAM = {
     { id: 'A9', group: 'finisher', parts: ['Dead hang'], sets: 1, maxTime: true, rest: 0, swap: { label: 'Farmer hold', parts: ['Farmer hold'] } }
   ]},
   B: { key: 'B', day: 'Wednesday', title: 'Session 2', focus: 'Legs + Chest', exercises: [
-    // Surf power: fresh, before heavy lifts. 3 gym days = max 3×/week.
-    { id: 'Bs1', group: 'surf', parts: ['Burpee to surf stance'], sets: 3, min: 8, max: 8, rest: 60, note: 'Max 2–3×/week. Done fresh before heavy lifts.', swap: { label: 'Explosive push-up 3 × 8', parts: ['Explosive push-up'] } },
-    { id: 'Bs2', group: 'surf', parts: ['Push-up into knee drive'], sets: 3, min: 8, max: 8, each: 'each side', rest: 60, swap: { label: 'Explosive push-up 3 × 8', parts: ['Explosive push-up'] } },
-    { id: 'Bs3', group: 'surf', parts: ['Lateral bound (stick)'], sets: 3, min: 8, max: 8, each: 'each side', rest: 60, swap: { label: 'Lateral bound 3 × 8 each side', parts: ['Lateral bound'] } },
     { id: 'B1', group: 'explosive', parts: ['Box jump'], sets: 3, min: 3, max: 3, rest: 60, swap: { label: 'Squat jump', parts: ['Squat jump'] } },
     { id: 'B2', group: 'explosive', parts: ['Med-ball chest pass'], sets: 3, min: 5, max: 5, rest: 60, swap: { label: 'Explosive push-up', parts: ['Explosive push-up'] } },
     { id: 'B3', group: 'main', main: true, parts: ['Back squat'], sets: 3, min: 6, max: 8, rest: 120, swap: { label: 'Leg press or hack squat', parts: ['Leg press or hack squat'] } },
@@ -110,14 +102,9 @@ const PROGRAM = {
     { id: 'B6', group: 'muscle', parts: ['Walking lunge'], sets: 3, min: 10, max: 10, each: 'each leg', rest: 90, swap: { label: 'Bulgarian split squat', parts: ['Bulgarian split squat'] } },
     { id: 'B7', group: 'muscle', parts: ['Dips'], sets: 3, min: 8, max: 12, rest: 90, swap: { label: 'Close-grip bench', parts: ['Close-grip bench'] } },
     { id: 'B8', group: 'muscle', parts: ['Standing calf raise'], sets: 3, min: 15, max: 20, rest: 60, swap: { label: 'Seated calf raise', parts: ['Seated calf raise'] } },
-    { id: 'B9', group: 'muscle', parts: ['Hanging knee raise'], sets: 3, min: 10, max: 12, rest: 60, swap: { label: 'Cable crunch', parts: ['Cable crunch'] } },
-    // Coach Kyle (Oct 2026): one long prone cobra hold to finish. Swap = the build-up version.
-    { id: 'B10', group: 'posture', parts: ['Prone cobra hold'], sets: 1, maxTime: true, timeText: '3+ min hold', rest: 0, note: 'Can\u2019t hold 3 min yet? Swap to the build-up: 3 \u00d7 60 s.', swap: { label: 'Build-up: 3 \u00d7 60 s holds', parts: ['Prone cobra hold'], sets: 3, holdTime: true, timeText: '60 s hold', rest: 60 } }
+    { id: 'B9', group: 'muscle', parts: ['Hanging knee raise'], sets: 3, min: 10, max: 12, rest: 60, swap: { label: 'Cable crunch', parts: ['Cable crunch'] } }
   ]},
   C: { key: 'C', day: 'Friday', title: 'Session 3', focus: 'Shoulders + Arms', exercises: [
-    // Surf power: fresh, before heavy lifts. Lateral bound already later as C2 — don't duplicate.
-    { id: 'Cs1', group: 'surf', parts: ['Burpee to surf stance'], sets: 3, min: 8, max: 8, rest: 60, note: 'Max 2–3×/week. Done fresh before heavy lifts. Lateral bounds are already in Explosive today.', swap: { label: 'Explosive push-up 3 × 8', parts: ['Explosive push-up'] } },
-    { id: 'Cs2', group: 'surf', parts: ['Push-up into knee drive'], sets: 3, min: 8, max: 8, each: 'each side', rest: 60, swap: { label: 'Explosive push-up 3 × 8', parts: ['Explosive push-up'] } },
     { id: 'C1', group: 'explosive', parts: ['Med-ball rotational throw'], sets: 3, min: 5, max: 5, each: 'each side', rest: 60, swap: { label: 'Cable woodchop (fast)', parts: ['Cable woodchop (fast)'] } },
     { id: 'C2', group: 'explosive', parts: ['Lateral bound'], sets: 3, min: 3, max: 3, each: 'each side', rest: 60, swap: { label: 'Skater hop', parts: ['Skater hop'] } },
     { id: 'C3', group: 'main', main: true, parts: ['Military press'], sets: 3, min: 6, max: 8, rest: 120, swap: { label: 'Seated DB shoulder press', parts: ['Seated DB shoulder press'] } },
@@ -131,6 +118,37 @@ const PROGRAM = {
     // Protector conditioning (from 9 Nov 2026): carry a person/gear. Short finisher, nothing else changed.
     { id: 'C11', group: 'finisher', from: '2026-11-09', parts: ['Sandbag carry'], sets: 3, min: 20, max: 30, rest: 60, note: 'Bear-hug or shoulder carry, 20–30 m. Swap shoulders each set.', swap: { label: 'No sandbag? Suitcase carry (one heavy DB), 30 m each side', parts: ['Suitcase carry'], min: 30, max: 30 } }
   ]}
+};
+
+/* At home during the day — not the gym session.
+   Surf power keeps the old sets, reps, swaps and notes. Mon + Wed: all three.
+   Friday drops Lateral bound (stick) because Session C still has Lateral bound (C2).
+   Posture: prone cobra every day (was Wednesday finisher B10). */
+const HOME_SURF = {
+  name: 'Surf power',
+  days: {
+    1: [
+      { id: 'As1', group: 'surf', parts: ['Burpee to surf stance'], sets: 3, min: 8, max: 8, rest: 60, note: 'Max 2–3×/week. Done fresh before heavy lifts.', swap: { label: 'Explosive push-up 3 × 8', parts: ['Explosive push-up'] } },
+      { id: 'As2', group: 'surf', parts: ['Push-up into knee drive'], sets: 3, min: 8, max: 8, each: 'each side', rest: 60, swap: { label: 'Explosive push-up 3 × 8', parts: ['Explosive push-up'] } },
+      { id: 'As3', group: 'surf', parts: ['Lateral bound (stick)'], sets: 3, min: 8, max: 8, each: 'each side', rest: 60, swap: { label: 'Lateral bound 3 × 8 each side', parts: ['Lateral bound'] } }
+    ],
+    3: [
+      { id: 'Bs1', group: 'surf', parts: ['Burpee to surf stance'], sets: 3, min: 8, max: 8, rest: 60, note: 'Max 2–3×/week. Done fresh before heavy lifts.', swap: { label: 'Explosive push-up 3 × 8', parts: ['Explosive push-up'] } },
+      { id: 'Bs2', group: 'surf', parts: ['Push-up into knee drive'], sets: 3, min: 8, max: 8, each: 'each side', rest: 60, swap: { label: 'Explosive push-up 3 × 8', parts: ['Explosive push-up'] } },
+      { id: 'Bs3', group: 'surf', parts: ['Lateral bound (stick)'], sets: 3, min: 8, max: 8, each: 'each side', rest: 60, swap: { label: 'Lateral bound 3 × 8 each side', parts: ['Lateral bound'] } }
+    ],
+    5: [
+      { id: 'Cs1', group: 'surf', parts: ['Burpee to surf stance'], sets: 3, min: 8, max: 8, rest: 60, note: 'Max 2–3×/week. Done fresh before heavy lifts. Lateral bounds are already in Explosive today.', swap: { label: 'Explosive push-up 3 × 8', parts: ['Explosive push-up'] } },
+      { id: 'Cs2', group: 'surf', parts: ['Push-up into knee drive'], sets: 3, min: 8, max: 8, each: 'each side', rest: 60, swap: { label: 'Explosive push-up 3 × 8', parts: ['Explosive push-up'] } }
+    ]
+  }
+};
+// Coach Kyle (Oct 2026): one long prone cobra hold. Swap = the build-up version. Daily, at home.
+const HOME_POSTURE = {
+  name: 'Posture',
+  exercises: [
+    { id: 'B10', group: 'posture', parts: ['Prone cobra hold'], sets: 1, maxTime: true, timeText: '3+ min hold', rest: 0, note: 'Can\u2019t hold 3 min yet? Swap to the build-up: 3 \u00d7 60 s.', swap: { label: 'Build-up: 3 \u00d7 60 s holds', parts: ['Prone cobra hold'], sets: 3, holdTime: true, timeText: '60 s hold', rest: 60 } }
+  ]
 };
 
 // Weekday (0 = Sun) -> session

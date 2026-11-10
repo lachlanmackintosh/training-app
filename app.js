@@ -222,8 +222,8 @@ function renderHome() {
   if (k === 'A' || k === 'B' || k === 'C') {
     const p = PROGRAM[k], exs = activeEx(p, d); const total = exs.reduce((a, ex) => a + target(ex, bi.phase).sets, 0);
     const done = exs.reduce((a, ex) => a + countDoneSets(ex, ds, bi.phase), 0);
-    todayHtml = `<div class="muted small">Today</div><h2 style="margin:4px 0 2px">${esc(p.title)}</h2><div class="subt">${esc(sessionSub(k))}</div>
-      <div class="muted small">${exs.length} exercises · about 60 min · ${done}/${total} sets done</div>
+    todayHtml = `<div class="muted small">Gym session</div><h2 style="margin:4px 0 2px">${esc(p.title)}</h2><div class="subt">${esc(sessionSub(k))}</div>
+      <div class="muted small">${exs.length} exercises · about 45–60 min · ${done}/${total} sets done</div>
       <a class="btn" style="margin-top:14px" href="#/workout/${k}">${done ? 'Continue workout' : 'Start workout'}</a>`;
   } else if (k === 'H') {
     const pk = hiitPick(d), o = HIIT[pk];
@@ -252,6 +252,7 @@ function renderHome() {
   <div class="card"><div class="row between wrap"><b>${esc(weekLine(bi))}</b>${phaseChip(bi)}</div>
     <div class="muted small" style="margin-top:6px">${esc(PHASES[bi.phase].short)}</div></div>
   <div class="card hero">${todayHtml}</div>
+  ${homeTodayCard(d, bi.phase)}
   <div class="card mobcard"><div class="row between"><b class="kicker">Today's mobility</b><span class="muted small">${mobMins(mk)} min</span></div>
     <div class="cardtitle">${esc(mo.name)}</div>
     <div class="muted small">${esc(mo.moves.slice(0, 4).map(x => x[0]).join(' · '))} …</div>
@@ -286,6 +287,27 @@ function setNightly(ds, on) {
   save(LS.nightly, all);
 }
 function nightlyStreak(ds) { const all = load(LS.nightly, {}); let n = 0; const d = parseYmd(ds); if (!all[ds]) d.setDate(d.getDate() - 1); while (all[ymd(d)]) { n++; d.setDate(d.getDate() - 1); } return n; }
+function homeDrillHtml(ex, phase) {
+  const t = target(Object.assign({}, ex, { id: '_' }), phase);
+  return `<div class="ex-mini"><div><b>${esc(ex.parts.join(' + '))}</b></div>
+    <div class="small"><span class="target">${esc(targetText(t))}</span> · <span class="muted">${ex.rest ? 'rest ' + restText(ex.rest) : 'no rest'}</span></div>
+    <div class="tline">${tempoChips(ex.parts)}</div>
+    ${ex.note ? `<div class="muted small" style="margin-top:4px">${esc(ex.note)}</div>` : ''}
+    <div class="sw">Swap: ${esc(ex.swap.label)} ${tempoChips(ex.swap.parts)}</div>
+    <details class="fold"><summary>Form and demo</summary><div class="parts">${ex.parts.map(demoHtml).join('')}</div></details></div>`;
+}
+function homeTodayCard(d, phase) {
+  const surf = HOME_SURF.days[d.getDay()] || [];
+  const surfBlock = surf.length ? `<div class="cardtitle" style="margin-top:14px">${esc(HOME_SURF.name)}</div>
+    <div class="muted small">${d.getDay() === 5 ? 'Burpee to surf stance and push-up into knee drive only. Lateral bound stays in the gym session today.' : 'All three drills. Max 2–3×/week, done fresh.'}</div>
+    ${surf.map(ex => homeDrillHtml(ex, phase)).join('')}` : '';
+  return `<div class="card" id="athome"><div class="row between"><b class="kicker">At home today</b><span class="muted small">not the gym</span></div>
+    <div class="muted small" style="margin-top:6px">Do these at home during the day, not at the gym.</div>
+    ${surfBlock}
+    <div class="cardtitle" style="margin-top:14px">${esc(HOME_POSTURE.name)}</div>
+    <div class="muted small">Daily. Long hold for the neck hump.</div>
+    ${HOME_POSTURE.exercises.map(ex => homeDrillHtml(ex, phase)).join('')}</div>`;
+}
 function nightlyCard(ds) {
   const on = nightlyDone(ds), st = nightlyStreak(ds);
   return `<div class="card nightcard${on ? ' done' : ''}" id="nightly"><div class="row between"><b class="kicker">Tonight · before bed</b><span class="muted small">${NIGHTLY.mins}+ min</span></div>
@@ -315,10 +337,10 @@ function renderProgram() {
   <div class="row between wrap"><span class="muted small">${esc(weekLine(bi))}</span>${phaseChip(bi)}</div>
   <div class="card"><b>The week</b><ul class="list">${WEEK_TABLE.map(([d, s]) => `<li class="row between"><span>${d}</span><span class="muted">${esc(s)}</span></li>`).join('')}</ul>
    <div class="muted small">All three gym days are full body. The name just shows the focus.</div></div>
-  <div class="card"><b>Every gym session (about 60 min)</b><ol class="bul small">
-   <li>Warm-up: 5 min easy bike, then 2 light sets of your first main lift</li><li>Surf power: burpee to stance, knee-drive push-up, lateral bound (stick) — fresh, before heavy lifts</li><li>Explosive: 2 moves, done fast and fresh</li>
+  <div class="card"><b>Every gym session (about 45–60 min)</b><ol class="bul small">
+   <li>Warm-up: 5 min easy bike, then 2 light sets of your first main lift</li><li>Explosive: 2 moves, done fast and fresh</li>
    <li>Main lifts: 2 heavy exercises</li><li>Muscle work: accessories and supersets</li><li>Finisher: neck and grip</li></ol>
-   <div class="muted small">Superset = do the two exercises back to back, then rest.</div></div>
+   <div class="muted small">Superset = do the two exercises back to back, then rest. Surf power and prone cobra are at home during the day, not in this session.</div></div>
   ${['A', 'B', 'C'].map(k => dayCard(PROGRAM[k])).join('')}
   <div class="card"><h3>HIIT</h3><div class="subt">Saturday · Fighter conditioning</div><ul class="bul small">
    <li>From 9 Nov: <b>A Aerobic intervals ↔ B Repeat sprints</b>, alternating weeks. Until then: ${HIIT_ROTATION.map(k => esc(HIIT[k].name)).join(' → ')}.</li>
@@ -413,10 +435,10 @@ function renderWorkout(k) {
   let html = `<div class="topbar"><a class="back" href="#/home" aria-label="Back">‹</a><div style="flex:1"><div class="muted small">${esc(weekLine(bi))}</div><h1 style="font-size:22px;margin:0">${esc(p.title)}</h1><div class="subt">${esc(p.day)} · ${esc(p.focus)}</div></div>${phaseChip(bi)}</div>
     <div class="note ${ph.cls}"><b>${ph.name}:</b> ${esc(ph.short)}</div>
     <details class="card fold"><summary>Warm-up</summary><div>5 min easy bike, then 2 light sets of your first main lift.</div></details>
-    <label class="toggle card" style="padding:10px 16px"><span><b>Short on time?</b><br><span class="muted small">Surf power, explosive moves and the 2 main lifts only</span></span><input type="checkbox" data-act="short" ${ui.short ? 'checked' : ''}></label>`;
+    <label class="toggle card" style="padding:10px 16px"><span><b>Short on time?</b><br><span class="muted small">Explosive moves and the 2 main lifts only</span></span><input type="checkbox" data-act="short" ${ui.short ? 'checked' : ''}></label>`;
   let lastGroup = '';
   activeEx(p, d).forEach((ex, i) => {
-    if (ui.short && !(ex.group === 'surf' || ex.group === 'explosive' || ex.group === 'main')) return;
+    if (ui.short && !(ex.group === 'explosive' || ex.group === 'main')) return;
     if (ex.group !== lastGroup) { html += `<div class="group-h">${GROUP_LABEL[ex.group]}</div>`; lastGroup = ex.group; }
     html += exerciseCard(ex, ds, bi.phase, i);
   });
@@ -516,7 +538,7 @@ function renderMobility() {
       <li>Gym days: do it after training or in the evening, not right before heavy or explosive work.</li>
       <li>Through the day: screen at eye level, and a few chin tucks every hour.</li>
       <li>Progress slowly. Range comes from doing a little most days.</li>
-      <li>Surf mobility: do the short daily Surf session most days. Slow pop-ups at the end. Save explosive surf power for gym days.</li></ul></details>`;
+      <li>Surf mobility: do the short daily Surf session most days. Slow pop-ups at the end. Surf power (burpee, knee drive, stick bound) is at home on Mon and Wed; Friday is burpee and knee drive only. Not at the gym.</li></ul></details>`;
 }
 function renderMobSession(key) {
   const mo = MOBILITY[key]; if (!mo) return go('#/mobility');
